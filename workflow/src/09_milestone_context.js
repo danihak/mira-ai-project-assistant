@@ -12,6 +12,7 @@ const FACTS = {
   next_milestones_after_window: facts.next_after_window,
   blocked: facts.blocked, overdue: facts.overdue, at_risk: facts.at_risk,
   at_risk_rules: facts.at_risk_rules,
+  alert_counts: { blocked: facts.blocked.length, overdue: facts.overdue.length, at_risk: facts.at_risk.length, total_task_alerts: facts.blocked.length + facts.overdue.length + facts.at_risk.length, upcoming_milestones: facts.upcoming_milestones.length },
   data_notes: facts.data_notes,
 };
 const request = {

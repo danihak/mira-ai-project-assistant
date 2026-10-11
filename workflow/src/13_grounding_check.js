@@ -28,6 +28,16 @@ if (router.route === 'status' && router.sprint && ctx.scope_task_ids) {
   const allowed = new Set([...ctx.scope_task_ids, ...facts.overdue.map(t => t.id), ...facts.blocked.map(t => t.id), ...facts.at_risk.map(t => t.id)]);
   taskIds.filter(id => !allowed.has(id)).forEach(id => flags.push(`Task ${id} is outside the requested scope`));
 }
+// v2 completeness checks (after baseline run 1, where T8 silently dropped an at-risk task):
+// every alert task must be mentioned (by ID or name) in milestone answers; every in-scope task in sprint reports/emails.
+const allTaskList = Object.values(facts.by_sprint).flatMap(s => s.tasks);
+const mentioned = id => { const t = allTaskList.find(x => x.id === id); return answer.includes(id) || (t && answer.toLowerCase().includes(t.name.toLowerCase())); };
+if (router.route === 'milestone') {
+  [...facts.blocked, ...facts.overdue, ...facts.at_risk].map(t => t.id).filter(id => !mentioned(id)).forEach(id => flags.push(`Omitted alert task ${id}`));
+}
+if ((router.route === 'stakeholder_update' || (router.route === 'status' && router.sprint)) && ctx.scope_task_ids) {
+  ctx.scope_task_ids.filter(id => !mentioned(id)).forEach(id => flags.push(`Omitted in-scope task ${id}`));
+}
 const notes = [];
 if (router.route !== 'clarify' && router.project_ref !== 'abcde') notes.push('Answer is based only on user-supplied details (no project files loaded) - review before sharing');
 
