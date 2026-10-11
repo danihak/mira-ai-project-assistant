@@ -25,6 +25,8 @@
 ## 3. Evaluation and fine-tuning
 **Experiments in Langfuse.** The 12 baseline inputs are a Langfuse dataset. I re-ran them live through the original v1 prompts and the current v2, with the same evaluator. v1 reproduced its failures on a fresh run (T8 dropped T009 again; T7 again tied the security blocker to Integration risk), while v2 passed 12/12. Being able to reproduce a failure, then show the fix removing it on the same inputs, is the strongest evidence the fix is real and not luck.
 
+**The judge needs judging too.** On those reproduced v1 defects, my code checker caught 2 of 3, and the LLM judge (gpt-4.1-mini) caught only 1 of 3. It scored the T8 answer 1.00 while claiming the missing task was present, and it accepted the security→Integration mislink as "related". So: count with code, judge reasoning with an LLM, and test the judge on a labelled set of known-bad answers before trusting its scores.
+
 The course loop is *evaluate → find failure → fix → re-evaluate*. Mira bakes the first step into every request: the Grounding Check records a `grounded` score (0/1) on every Langfuse trace, so groundedness becomes a production metric, not a one-off test. The 12 baseline inputs are the regression suite, and any prompt or model change must pass them again.
 
 Fine-tuning comes **after** prompt and architecture fixes, and only for the agent that still fails. The most likely candidate is the Planner, which has the most free text and the most room to add "helpful" goals. The plan:

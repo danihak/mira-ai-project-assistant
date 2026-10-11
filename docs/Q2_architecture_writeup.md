@@ -130,4 +130,13 @@ The estimates made before the run, using exact prompt tokens and estimated outpu
   - p50/p90/p95/p99 latency per agent
   - cost per agent, including the judge
   - request mix by agent
+- **Evaluating the evaluators.** On the three defects v1 reproduced, I checked each automatic evaluator against the real answer text:
+
+  | v1 defect | Code Grounding Check | LLM judge (`faithfulness`) | Truth (manual check) |
+  |---|---|---|---|
+  | T8 omits at-risk task T009 | **Caught** ("Omitted alert task T009") | **Missed (1.00)**; it claimed T009 was listed | T009 absent |
+  | T11 omits 3 alerts | **Caught** | **Caught (0.70)** | Omitted |
+  | T7 cites the security blocker as *Integration* evidence | Not designed to catch | **Missed (1.00)**: "integration and security are related" | Wrong link |
+
+  **Lesson:** the LLM judge can itself hallucinate (T8) and rationalise plausible-sounding errors (T7). Code checks are more reliable for anything countable. The judge adds value for reasoning-level issues, but it needs its own evaluation, ideally with a stronger judge model and a labelled set of known-bad answers. The T7 class of error is prevented by design in v2: evidence links are computed in code, not judged afterwards.
 - **Finding from the dashboard:** the LLM judge costs more than all of Mira's agents combined. In production I would sample it (for example 10–20% of traffic, plus 100% of anything the code evaluator flags) rather than judge every answer.
