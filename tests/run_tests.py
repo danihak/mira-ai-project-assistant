@@ -146,19 +146,25 @@ def md_escape(s):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url", required=True, help="Mira webhook URL, e.g. http://localhost:5678/webhook/mira")
+    ap.add_argument("--url", help="Mira webhook URL, e.g. http://localhost:5678/webhook/mira")
+    ap.add_argument("--from-json", help="score saved responses (results.json) instead of calling the webhook")
+    ap.add_argument("--out", default="baseline_results.md", help="report file name inside tests/results/")
+    ap.add_argument("--title", default="Mira - Baseline Test Results")
     ap.add_argument("--only", nargs="*", help="run a subset, e.g. --only T5 T10")
     ap.add_argument("--timeout", type=int, default=180)
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
 
     rows, raw = [], {}
+    saved = json.loads(pathlib.Path(args.from_json).read_text()) if args.from_json else None
+    if not saved and not args.url:
+        ap.error("give --url or --from-json")
     for tid, msg, ttype, expected in TESTS:
         if args.only and tid not in args.only:
             continue
         print(f"{tid} ... ", end="", flush=True)
         try:
-            r = call(args.url, tid, msg, args.timeout)
+            r = saved[tid] if saved else call(args.url, tid, msg, args.timeout)
         except Exception as e:  # noqa
             r = {"answer": f"ERROR: {e}", "route": None, "grounding": {"passed": False, "flags": [str(e)]}, "totals": {}}
         ok, bad = check(tid, r)
@@ -167,11 +173,12 @@ def main():
         raw[tid] = r
         rows.append((tid, msg, ttype, expected, r, ok, bad, status))
 
-    (OUT / "results.json").write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    if not saved:
+        (OUT / "results.json").write_text(json.dumps(raw, indent=2), encoding="utf-8")
 
     passed = sum(1 for x in rows if x[7] == "PASS")
     tot_cost = sum((x[4].get("totals") or {}).get("cost_usd", 0) or 0 for x in rows)
-    lines = ["# Mira - Baseline Test Results", "",
+    lines = [f"# {args.title}", "",
              f"Run: {time.strftime('%Y-%m-%d %H:%M')} | Report date used by Mira (as-of): {next((x[4].get('as_of_date') for x in rows if x[4].get('as_of_date')), 'n/a')}",
              f"**Result: {passed}/{len(rows)} passed** | Total LLM cost for the run: ${tot_cost:.4f}", "",
              "## Summary", "",
@@ -196,8 +203,8 @@ def main():
                   f"| Hallucination detected? | {md_escape(halluc)} - manual review: ____ |",
                   f"| Pass/Fail | **{status}** |", "",
                   "<details><summary>Full output</summary>", "", "```text", r.get("answer", ""), "```", "", "</details>", ""]
-    (OUT / "baseline_results.md").write_text("\n".join(lines), encoding="utf-8")
-    print(f"\n{passed}/{len(rows)} passed. Wrote {OUT / 'baseline_results.md'}")
+    (OUT / args.out).write_text("\n".join(lines), encoding="utf-8")
+    print(f"\n{passed}/{len(rows)} passed. Wrote {OUT / args.out}")
 
 
 if __name__ == "__main__":

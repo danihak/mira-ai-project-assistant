@@ -1,0 +1,606 @@
+{
+ "T1": {
+  "test_id": "T1",
+  "request": "Generate a project plan for the AI Adoption Project at ABCDE Ltd. Use the provided project description.",
+  "as_of_date": "2026-04-24",
+  "route": "plan",
+  "intent": "plan",
+  "project_ref": "abcde",
+  "sprint": null,
+  "router_reason": "The request refers to the loaded project data.",
+  "guardrails": [],
+  "answer": "## 1. Project Summary\nThe AI Adoption Project at ABCDE Ltd. aims to enhance operational efficiency, improve customer experience, and drive data-driven decision-making by integrating AI-powered tools into core business functions. The initiative will focus on demand forecasting, route optimization, inventory management, and customer support, leveraging machine learning and natural language processing.\n\n## 2. Goals & Success Metrics\n- Reduce delivery delays by 15%\n- Lower operational costs by 10%\n- Improve service responsiveness\n\n## 3. Phase Plan\n\n| Phase                       | Weeks | Dates           | Key Activities                                         | Milestones / Deliverables                               | Linked Tasks (IDs from the task list) |\n|-----------------------------|-------|-----------------|-------------------------------------------------------|--------------------------------------------------------|---------------------------------------|\n| Project Initiation          | 1-2   | 2026-03-30 to 2026-04-12 | Define project scope; Form cross-functional team; Initial stakeholder meeting | Project charter signed off, Team structure finalized   | T001, T002, T003                     |\n| Current State Analysis      | 3-4   | 2026-04-13 to 2026-04-26 | Assess existing processes & systems; Identify data sources & gaps | Current systems audit report, Gap analysis report      | T004, T005, T006                     |\n| Use Case Selection          | 5-6   | 2026-04-27 to 2026-05-10 | Shortlist priority AI use cases (forecasting, route optimization) | Final list of prioritized use cases with success criteria | T007, T008, T009, T025               |\n| Pilot Design                | 7-10  | 2026-05-11 to 2026-06-07 | Data collection & preparation; Model design and development | Working prototype models, Data pipelines established    | T010, T011, T012                      |\n| Pilot Implementation         | 11-14 | 2026-06-08 to 2026-07-05 | Deploy AI models in test environments; Monitor performance | Pilot results report, User feedback and performance metrics | T015, T016, T017                      |\n| Evaluation & Iteration      | 15-16 | 2026-07-06 to 2026-07-19 | Evaluate pilot outcomes; Adjust models as needed       | Updated models and process refinements                  | T018                                  |\n| Full Deployment             | 17-22 | 2026-07-20 to 2026-08-30 | Scale AI models across selected departments; Train staff | Full production rollout, Training sessions completed     | T019, T020, T021, T022                |\n| Monitoring & Review         | 23-24 | 2026-08-31 to 2026-09-13 | Continuous performance monitoring; Final project review | Project closure report, Recommendations for future scaling | T023                                  |\n\n## 4. Key Milestones\n- Project charter signed off - 2026-04-12\n- Team structure finalized - 2026-04-12\n- Current systems audit report - 2026-04-26\n- Gap analysis report - 2026-04-26\n- Final list of prioritized use cases with success criteria - 2026-05-10\n- Working prototype models - 2026-06-07\n- Data pipelines established - 2026-06-07\n- Pilot results report - 2026-07-05\n- User feedback and performance metrics - 2026-07-05\n- Updated models and process refinements - 2026-07-19\n- Full production rollout - 2026-08-30\n- Training sessions completed - 2026-08-30\n- Project closure report - 2026-09-13\n- Recommendations for future scaling - 2026-09-13\n\n## 5. Team & Governance\nA cross-functional task force comprising data scientists, IT professionals, and business stakeholders will oversee the deployment and ensure alignment with organizational objectives.\n\n## 6. Dependencies & Assumptions\n- Task board ends on 2026-08-04; timeline runs to 2026-09-13. Board and timeline are not fully aligned. [FROM DATA]\n- Tasks may need to be adjusted to align with the project timeline. [ASSUMPTION]\n\n## 7. Open Questions for the Sponsor\n- Budget for the AI adoption initiative.\n- Tooling decisions for AI model development and deployment.\n- Approval gates for each phase of the project.",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [
+    "T001",
+    "T002",
+    "T003",
+    "T004",
+    "T005",
+    "T006",
+    "T007",
+    "T008",
+    "T009",
+    "T025",
+    "T010",
+    "T011",
+    "T012",
+    "T015",
+    "T016",
+    "T017",
+    "T018",
+    "T019",
+    "T020",
+    "T021",
+    "T022",
+    "T023"
+   ],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 778,
+    "output_tokens": 87,
+    "latency_ms": 1370,
+    "cost_usd": 0.000169
+   },
+   {
+    "agent": "Planner Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 3105,
+    "output_tokens": 949,
+    "latency_ms": 9438,
+    "cost_usd": 0.001035
+   }
+  ],
+  "totals": {
+   "input_tokens": 3883,
+   "output_tokens": 1036,
+   "cost_usd": 0.001204,
+   "latency_ms": 10882
+  },
+  "trace_id": "mira-32-1791698705624"
+ },
+ "T2": {
+  "test_id": "T2",
+  "request": "Generate a project plan for: \"We want to build a chatbot.\"",
+  "as_of_date": "2026-04-24",
+  "route": "clarify",
+  "intent": "plan",
+  "project_ref": "other",
+  "sprint": null,
+  "router_reason": "The request does not provide enough details about the project scope, deliverables, timeline, or team.",
+  "guardrails": [
+   "insufficient project detail"
+  ],
+  "answer": "INSUFFICIENT DETAIL - I can't generate a project plan from \"We want to build a chatbot.\" without inventing scope, dates and people.\n\nPlease share:\n- Project goal and scope (what is being built and why)\n- Key deliverables\n- Timeline: start date, duration or deadline\n- Team size and roles\n- Constraints: budget, technology, dependencies\n- Success criteria / KPIs\n\nOr ask about the ABCDE Ltd. AI Adoption Project, which is already loaded.",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 772,
+    "output_tokens": 107,
+    "latency_ms": 1198,
+    "cost_usd": 0.00018
+   },
+   {
+    "agent": "Clarifier (rule-based)",
+    "model": "none (rule-based)",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "latency_ms": 19,
+    "cost_usd": 0
+   }
+  ],
+  "totals": {
+   "input_tokens": 772,
+   "output_tokens": 107,
+   "cost_usd": 0.00018,
+   "latency_ms": 1287
+  },
+  "trace_id": "mira-33-1791698717332"
+ },
+ "T3": {
+  "test_id": "T3",
+  "request": "Generate a risk assessment for the AI Adoption Project at ABCDE Ltd. Use the provided project description.",
+  "as_of_date": "2026-04-24",
+  "route": "risk",
+  "intent": "risk",
+  "project_ref": "abcde",
+  "sprint": null,
+  "router_reason": "The request refers to the loaded project data and is sufficient for a risk assessment.",
+  "guardrails": [],
+  "answer": "## Risk Matrix\n| ID  | Category                     | Risk                                      | Impact                                           | Likelihood (H/M/L) | Severity (H/M/L) | Evidence in Project Data                                                                 | Mitigation (register)                                                | Next Action [SUGGESTED]                     |\n|-----|------------------------------|-------------------------------------------|--------------------------------------------------|---------------------|------------------|-------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------|\n| R09 | Security Vulnerabilities      | AI models targeted by adversarial attacks | Data breaches and operational risks              | H                   | H                | T024 Security review of AI infrastructure - Blocked: waiting for security team availability | Adopt AI security best practices and penetration testing            | Resolve blockage with security team         |\n| R01 | Data Quality & Availability   | Incomplete or unstructured data           | Poor model performance and inaccurate outcomes    | H                   | H                | T006 Identify data gaps and quality issues - Overdue: Overdue by 3 day(s), still In Progress | Perform early data audits and implement robust data governance      | Complete overdue task T006                  |\n| R05 | Ethical & Legal Concerns     | Risks of biased models or data privacy violations | Legal repercussions and reputational damage      | H                   | H                | T025 Legal review of data usage - At risk: Due in 4 day(s), still In Progress             | Involve legal early and implement fairness checks                   | Ensure timely completion of T025            |\n| R10 | Vendor Lock-in               | Overdependence on a specific AI platform  | Flexibility loss and future switching costs      | H                   | M                | T009 Vendor evaluation for ML platform - At risk: Due in 11 day(s), still To Do          | Favor open standards and negotiate flexible vendor terms            | Prioritize completion of T009               |\n| R02 | Integration Issues           | Difficulty integrating AI with legacy systems | Delays in deployment and operational disruptions  | M                   | M                | No current signal                                                                         | Plan integration roadmap and use APIs/middleware                    | Initiate integration planning                |\n| R03 | Talent & Skills Gap          | Lack of internal AI/ML expertise          | Overreliance on external vendors and slow progress | M                   | M                | No current signal                                                                         | Provide staff training and hire specialized talent                  | Develop training program                     |\n| R04 | Change Resistance            | Employees resist adopting AI-driven workflows | Low adoption and reduced ROI                     | M                   | M                | No current signal                                                                         | Strong change management and early engagement                       | Engage employees early                       |\n| R08 | Model Performance Drift      | AI models lose accuracy over time         | Incorrect decisions and trust erosion            | M                   | M                | No current signal                                                                         | Regular retraining cycles and monitoring dashboards                  | Establish monitoring plan                    |\n| R06 | Cost Overruns                | Underestimation of AI development costs   | Budget constraints and project delays            | L                   | M                | No current signal                                                                         | Set realistic budget and build in contingency funds                 | Review budget estimates                      |\n| R07 | Unrealistic Expectations      | Stakeholders expect immediate ROI          | Disillusionment and loss of support             | L                   | M                | No current signal                                                                         | Align expectations and show quick wins                               | Communicate realistic timelines              |\n\n## Live Signals Driving the Ratings\n- T024, Blocked, waiting for security team availability (R09)\n- T006, Overdue, Overdue by 3 day(s), still In Progress (R01)\n- T025, At risk, Due in 4 day(s), still In Progress (R05)\n- T009, At risk, Due in 11 day(s), still To Do (R10)\n\n## Rating Method\nThe risk register does not include likelihood or severity scores, so ratings are based on evidence strength: LIVE SIGNAL indicates a likelihood of High, PLANNED WORK ONLY indicates Medium, and NO CURRENT SIGNAL indicates Low. The ranking follows the evidence ranking rule based on the scores derived from linked live signals.",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [
+    "T024",
+    "T006",
+    "T025",
+    "T009"
+   ],
+   "risk_ids_cited": [
+    "R09",
+    "R01",
+    "R05",
+    "R10",
+    "R02",
+    "R03",
+    "R04",
+    "R08",
+    "R06",
+    "R07"
+   ]
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 778,
+    "output_tokens": 94,
+    "latency_ms": 1764,
+    "cost_usd": 0.000173
+   },
+   {
+    "agent": "Risk Assessor Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 2754,
+    "output_tokens": 822,
+    "latency_ms": 8785,
+    "cost_usd": 0.000906
+   }
+  ],
+  "totals": {
+   "input_tokens": 3532,
+   "output_tokens": 916,
+   "cost_usd": 0.001079,
+   "latency_ms": 10621
+  },
+  "trace_id": "mira-34-1791698719684"
+ },
+ "T4": {
+  "test_id": "T4",
+  "request": "Generate a risk assessment for: \"New project starting soon.\"",
+  "as_of_date": "2026-04-24",
+  "route": "clarify",
+  "intent": "risk",
+  "project_ref": "none",
+  "sprint": null,
+  "router_reason": "Insufficient information about the project to conduct a risk assessment.",
+  "guardrails": [
+   "insufficient project detail"
+  ],
+  "answer": "INSUFFICIENT DETAIL - I can't generate a risk assessment from \"New project starting soon.\" without inventing scope, dates and people.\n\nPlease share:\n- What the project is: domain, scope and goals\n- Timeline and current phase\n- Team, vendors and technologies involved\n- Known constraints (budget, compliance, integrations)\n- Any existing risk register or known issues\n\nOr ask about the ABCDE Ltd. AI Adoption Project, which is already loaded.",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 770,
+    "output_tokens": 93,
+    "latency_ms": 1181,
+    "cost_usd": 0.000171
+   },
+   {
+    "agent": "Clarifier (rule-based)",
+    "model": "none (rule-based)",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "latency_ms": 14,
+    "cost_usd": 0
+   }
+  ],
+  "totals": {
+   "input_tokens": 770,
+   "output_tokens": 93,
+   "cost_usd": 0.000171,
+   "latency_ms": 1258
+  },
+  "trace_id": "mira-35-1791698731228"
+ },
+ "T5": {
+  "test_id": "T5",
+  "request": "Generate a weekly status report using the sample task board data for Sprint 3.",
+  "as_of_date": "2026-04-24",
+  "route": "status",
+  "intent": "status",
+  "project_ref": "abcde",
+  "sprint": 3,
+  "router_reason": "The request refers to the loaded project data and specifies a sprint for the status report.",
+  "guardrails": [],
+  "answer": "# Weekly Status Report - Sprint 3 - week ending 2026-04-24\n**Overall health:** AMBER - T024 Security review of AI infrastructure is Blocked (High priority), T006 Identify data gaps and quality issues is overdue (due 2026-04-21), 4 task(s) at risk of missing due dates in the next 14 days.\n\n## Summary\n| Status      | Count |\n|-------------|-------|\n| Done        | 0     |\n| In Progress  | 2     |\n| Blocked     | 0     |\n| To Do       | 2     |\n| Total       | 4     |\n\n## Completed\nNone\n\n## In Progress\n- T007 - Shortlist AI use cases - Arjun Mehta - due 2026-04-28\n- T025 - Legal review of data usage - Sarah Lin - due 2026-04-28\n\n## Blocked\nNone\n\n## To Do (in scope)\n- T008 - Define success criteria for each use case - Sarah Lin - due 2026-05-02\n- T009 - Vendor evaluation for ML platform - James Wong - due 2026-05-05\n\n## Overdue / Carry-over\n- T006 - Identify data gaps and quality issues - Priya Nair - due 2026-04-21 (Overdue by 3 day(s), still In Progress)\n\n## Upcoming Milestones (next 14 days)\n- Current systems audit report - due 2026-04-26\n- Gap analysis report - due 2026-04-26\n\n## Asks & Escalations\n- T024 Security review of AI infrastructure is Blocked (High priority).",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [
+    "T024",
+    "T006",
+    "T007",
+    "T025",
+    "T008",
+    "T009"
+   ],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 774,
+    "output_tokens": 92,
+    "latency_ms": 1252,
+    "cost_usd": 0.000171
+   },
+   {
+    "agent": "Status Reporter Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 1771,
+    "output_tokens": 355,
+    "latency_ms": 3044,
+    "cost_usd": 0.000479
+   }
+  ],
+  "totals": {
+   "input_tokens": 2545,
+   "output_tokens": 447,
+   "cost_usd": 0.00065,
+   "latency_ms": 4353
+  },
+  "trace_id": "mira-36-1791698733559"
+ },
+ "T6": {
+  "test_id": "T6",
+  "request": "Generate a weekly status report for: \"Things are going fine.\"",
+  "as_of_date": "2026-04-24",
+  "route": "clarify",
+  "intent": "status",
+  "project_ref": "none",
+  "sprint": null,
+  "router_reason": "The request lacks specific task data needed for a status report.",
+  "guardrails": [
+   "no task data supplied for a non-loaded project"
+  ],
+  "answer": "NO TASK DATA AVAILABLE - I can't produce a status report from \"Things are going fine.\". Reporting progress without task data would mean inventing task statuses and percentages.\n\nPlease share:\n- Task board export (CSV, Trello or Jira) with task name, status, assignee, due date and sprint\n- Reporting period (which week or sprint)\n\nOr ask about the ABCDE Ltd. AI Adoption Project, which is already loaded.",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 771,
+    "output_tokens": 84,
+    "latency_ms": 1821,
+    "cost_usd": 0.000166
+   },
+   {
+    "agent": "Clarifier (rule-based)",
+    "model": "none (rule-based)",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "latency_ms": 18,
+    "cost_usd": 0
+   }
+  ],
+  "totals": {
+   "input_tokens": 771,
+   "output_tokens": 84,
+   "cost_usd": 0.000166,
+   "latency_ms": 1904
+  },
+  "trace_id": "mira-37-1791698738963"
+ },
+ "T7": {
+  "test_id": "T7",
+  "request": "What are the top 3 risks for the ABCDE Ltd project based on the risk data?",
+  "as_of_date": "2026-04-24",
+  "route": "risk",
+  "intent": "risk",
+  "project_ref": "abcde",
+  "sprint": null,
+  "router_reason": "The request pertains to the risk assessment of the loaded project data.",
+  "guardrails": [],
+  "answer": "1. **R09**: Security Vulnerabilities  \n   - **Risk**: AI models targeted by adversarial attacks  \n   - **Why it ranks here**: \"T024 Security review of AI infrastructure - Blocked: waiting for security team availability\"  \n   - **Mitigation**: Adopt AI security best practices and penetration testing  \n\n2. **R01**: Data Quality & Availability  \n   - **Risk**: Incomplete or unstructured data  \n   - **Why it ranks here**: \"T006 Identify data gaps and quality issues - Overdue: Overdue by 3 day(s), still In Progress\"  \n   - **Mitigation**: Perform early data audits and implement robust data governance  \n\n3. **R05**: Ethical & Legal Concerns  \n   - **Risk**: Risks of biased models or data privacy violations  \n   - **Why it ranks here**: \"T025 Legal review of data usage - At risk: Due in 4 day(s), still In Progress\"  \n   - **Mitigation**: Involve legal early and implement fairness checks  ",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [
+    "T024",
+    "T006",
+    "T025"
+   ],
+   "risk_ids_cited": [
+    "R09",
+    "R01",
+    "R05"
+   ]
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 777,
+    "output_tokens": 71,
+    "latency_ms": 1116,
+    "cost_usd": 0.000159
+   },
+   {
+    "agent": "Risk Assessor Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 2753,
+    "output_tokens": 223,
+    "latency_ms": 2149,
+    "cost_usd": 0.000547
+   }
+  ],
+  "totals": {
+   "input_tokens": 3530,
+   "output_tokens": 294,
+   "cost_usd": 0.000706,
+   "latency_ms": 3330
+  },
+  "trace_id": "mira-38-1791698741648"
+ },
+ "T8": {
+  "test_id": "T8",
+  "request": "Which tasks are blocked or at risk of missing their deadline based on the task board?",
+  "as_of_date": "2026-04-24",
+  "route": "milestone",
+  "intent": "milestone",
+  "project_ref": "abcde",
+  "sprint": null,
+  "router_reason": "The request pertains to identifying blocked tasks or those at risk of missing deadlines, which aligns with the loaded project data.",
+  "guardrails": [],
+  "answer": "1. You have 1 blocked task, 1 overdue task, 4 at-risk tasks, and 2 upcoming milestones.\n\n## Alerts\n| Item                                          | Type                | Due         | Owner          | Why                                                   | Suggested Action [SUGGESTED] |\n|-----------------------------------------------|---------------------|-------------|----------------|-------------------------------------------------------|-------------------------------|\n| T024 - Security review of AI infrastructure    | Blocked             | 2026-05-26  | James Wong     | Blocked: waiting for security team availability       | Follow up with security team  |\n| T006 - Identify data gaps and quality issues   | Overdue             | 2026-04-21  | Priya Nair    | Overdue by 3 day(s), still In Progress                | Prioritize completion          |\n| T007 - Shortlist AI use cases                  | At Risk             | 2026-04-28  | Arjun Mehta   | Due in 4 day(s), still In Progress                    | Ensure progress is made        |\n| T008 - Define success criteria for each use case| At Risk             | 2026-05-02  | Sarah Lin     | Due in 8 day(s), still To Do                          | Start task immediately         |\n| T009 - Vendor evaluation for ML platform       | At Risk             | 2026-05-05  | James Wong    | Due in 11 day(s), still To Do                         | Begin evaluation process       |\n| T025 - Legal review of data usage              | At Risk             | 2026-04-28  | Sarah Lin     | Due in 4 day(s), still In Progress                    | Ensure timely completion       |\n| Current systems audit report                   | Upcoming Milestone   | 2026-04-26  | N/A            | N/A                                                   | Prepare for submission         |\n| Gap analysis report                            | Upcoming Milestone   | 2026-04-26  | N/A            | N/A                                                   | Prepare for submission         |\n\n## Milestone Outlook\nCurrent phase: Current State Analysis  \nUpcoming milestones in the window:  \n- Current systems audit report (Due: 2026-04-26)  \n- Gap analysis report (Due: 2026-04-26)  \n\nNext milestone after the window:  \n- Final list of prioritized use cases with success criteria (Due: 2026-05-10)\n\n## Method\nReport date: 2026-04-24; At-risk rules: In Progress and due within 7 days, or To Do and due within 14 days.",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [
+    "T024",
+    "T006",
+    "T007",
+    "T008",
+    "T009",
+    "T025"
+   ],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 775,
+    "output_tokens": 99,
+    "latency_ms": 1448,
+    "cost_usd": 0.000176
+   },
+   {
+    "agent": "Milestone Tracker Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 2067,
+    "output_tokens": 533,
+    "latency_ms": 4731,
+    "cost_usd": 0.00063
+   }
+  ],
+  "totals": {
+   "input_tokens": 2842,
+   "output_tokens": 632,
+   "cost_usd": 0.000806,
+   "latency_ms": 6256
+  },
+  "trace_id": "mira-39-1791698745897"
+ },
+ "T9": {
+  "test_id": "T9",
+  "request": "Generate a project plan for a 2-week project with no details provided.",
+  "as_of_date": "2026-04-24",
+  "route": "clarify",
+  "intent": "plan",
+  "project_ref": "none",
+  "sprint": null,
+  "router_reason": "Insufficient details provided to create a project plan.",
+  "guardrails": [
+   "insufficient project detail"
+  ],
+  "answer": "INSUFFICIENT DETAIL - I can't generate a project plan from \"a 2-week project with no details provided\" without inventing scope, dates and people.\n\nPlease share:\n- Project goal and scope (what is being built and why)\n- Key deliverables\n- Timeline: start date, duration or deadline\n- Team size and roles\n- Constraints: budget, technology, dependencies\n- Success criteria / KPIs\n\nOr ask about the ABCDE Ltd. AI Adoption Project, which is already loaded.",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 773,
+    "output_tokens": 93,
+    "latency_ms": 1251,
+    "cost_usd": 0.000172
+   },
+   {
+    "agent": "Clarifier (rule-based)",
+    "model": "none (rule-based)",
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "latency_ms": 17,
+    "cost_usd": 0
+   }
+  ],
+  "totals": {
+   "input_tokens": 773,
+   "output_tokens": 93,
+   "cost_usd": 0.000172,
+   "latency_ms": 1331
+  },
+  "trace_id": "mira-40-1791698753244"
+ },
+ "T10": {
+  "test_id": "T10",
+  "request": "Summarize the current project status: how many tasks are done, in progress, and to do?",
+  "as_of_date": "2026-04-24",
+  "route": "status",
+  "intent": "status",
+  "project_ref": "abcde",
+  "sprint": null,
+  "router_reason": "The request is clear and refers to the loaded project data.",
+  "guardrails": [],
+  "answer": "There are currently 5 tasks done, 3 tasks in progress, and 16 tasks to do.\n\n| Status       | Count |\n|--------------|-------|\n| Done         | 5     |\n| In Progress   | 3     |\n| Blocked      | 1     |\n| To Do        | 16    |\n| Total        | 25    |",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 779,
+    "output_tokens": 83,
+    "latency_ms": 1197,
+    "cost_usd": 0.000167
+   },
+   {
+    "agent": "Status Reporter Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 3288,
+    "output_tokens": 75,
+    "latency_ms": 1002,
+    "cost_usd": 0.000538
+   }
+  ],
+  "totals": {
+   "input_tokens": 4067,
+   "output_tokens": 158,
+   "cost_usd": 0.000705,
+   "latency_ms": 2278
+  },
+  "trace_id": "mira-41-1791698755559"
+ },
+ "T11": {
+  "test_id": "T11",
+  "request": "What milestones are coming up in the next 2 weeks based on the timeline?",
+  "as_of_date": "2026-04-24",
+  "route": "milestone",
+  "intent": "milestone",
+  "project_ref": "abcde",
+  "sprint": null,
+  "router_reason": "The request refers to the loaded project data and asks for upcoming milestones.",
+  "guardrails": [],
+  "answer": "1. There are 2 upcoming milestones in the next 2 weeks, along with 1 blocked task, 1 overdue task, and 4 at-risk tasks.\n\n## Alerts\n| Item                                          | Type                | Due         | Owner          | Why                                                       | Suggested Action [SUGGESTED] |\n|-----------------------------------------------|---------------------|-------------|----------------|-----------------------------------------------------------|-------------------------------|\n| T024 - Security review of AI infrastructure   | Blocked             | 2026-05-26  | James Wong     | Blocked: waiting for security team availability           | Follow up with security team  |\n| T006 - Identify data gaps and quality issues  | Overdue             | 2026-04-21  | Priya Nair     | Overdue by 3 day(s), still In Progress                    | Expedite completion            |\n| T007 - Shortlist AI use cases                 | At Risk             | 2026-04-28  | Arjun Mehta    | Due in 4 day(s), still In Progress                        | Prioritize task                |\n| T008 - Define success criteria for each use case | At Risk           | 2026-05-02  | Sarah Lin      | Due in 8 day(s), still To Do                              | Start task                     |\n| T009 - Vendor evaluation for ML platform      | At Risk             | 2026-05-05  | James Wong     | Due in 11 day(s), still To Do                             | Start task                     |\n| T025 - Legal review of data usage             | At Risk             | 2026-04-28  | Sarah Lin      | Due in 4 day(s), still In Progress                        | Prioritize task                |\n| Current systems audit report                   | Upcoming Milestone   | 2026-04-26  | N/A            | N/A                                                       | Prepare for submission         |\n| Gap analysis report                            | Upcoming Milestone   | 2026-04-26  | N/A            | N/A                                                       | Prepare for submission         |\n\n## Milestone Outlook\n- Current Phase: Current State Analysis\n- Upcoming Milestones:\n  - Current systems audit report - Due: 2026-04-26\n  - Gap analysis report - Due: 2026-04-26\n- Next Milestone after the window: Final list of prioritized use cases with success criteria - Due: 2026-05-10\n\n## Method\nReport date is 2026-04-24; at-risk rules are: \"In Progress and due within 7 days, or To Do and due within 14 days.\"",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [
+    "T024",
+    "T006",
+    "T007",
+    "T008",
+    "T009",
+    "T025"
+   ],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 774,
+    "output_tokens": 89,
+    "latency_ms": 1329,
+    "cost_usd": 0.00017
+   },
+   {
+    "agent": "Milestone Tracker Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 2066,
+    "output_tokens": 539,
+    "latency_ms": 6556,
+    "cost_usd": 0.000633
+   }
+  ],
+  "totals": {
+   "input_tokens": 2840,
+   "output_tokens": 628,
+   "cost_usd": 0.000803,
+   "latency_ms": 7944
+  },
+  "trace_id": "mira-42-1791698758658"
+ },
+ "T12": {
+  "test_id": "T12",
+  "request": "Generate a stakeholder update email summarizing Sprint 2 progress.",
+  "as_of_date": "2026-04-24",
+  "route": "stakeholder_update",
+  "intent": "stakeholder_update",
+  "project_ref": "abcde",
+  "sprint": 2,
+  "router_reason": "Task data is needed to summarize Sprint 2 progress.",
+  "guardrails": [],
+  "answer": "Subject: AI Adoption Project — Sprint 2 progress update\n\nHi all,\n\nIn Sprint 2, we have completed 2 tasks and have 1 task currently in progress. There are no blocked tasks at this time.\n\nCompleted:\n- Audit existing data infrastructure - Priya Nair\n- Map current logistics workflows - James Wong\n\nIn progress:\n- Identify data gaps and quality issues - Priya Nair - due 2026-04-21 (past due)\n\nBlocked / risks: None in this sprint\n\nNext steps: Complete the identification of data gaps and quality issues.\n\nRegards,  \nMira (Project Intelligence Assistant) on behalf of the PMO",
+  "grounding": {
+   "passed": true,
+   "flags": [],
+   "notes": [],
+   "task_ids_cited": [],
+   "risk_ids_cited": []
+  },
+  "agents": [
+   {
+    "agent": "Orchestrator",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 770,
+    "output_tokens": 92,
+    "latency_ms": 1454,
+    "cost_usd": 0.000171
+   },
+   {
+    "agent": "Stakeholder Update Agent",
+    "model": "gpt-4o-mini-2024-07-18",
+    "input_tokens": 682,
+    "output_tokens": 132,
+    "latency_ms": 1819,
+    "cost_usd": 0.000181
+   }
+  ],
+  "totals": {
+   "input_tokens": 1452,
+   "output_tokens": 224,
+   "cost_usd": 0.000352,
+   "latency_ms": 3347
+  },
+  "trace_id": "mira-43-1791698767532"
+ }
+}

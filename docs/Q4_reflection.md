@@ -2,14 +2,17 @@
 
 **Author:** Danish
 
-> Sections marked _[after live run]_ are completed with numbers from `tests/results/baseline_results.md` and the Langfuse traces once the workflow has run against the real model.
+> Based on two live runs of the 12-input baseline on n8n Cloud with gpt-4o-mini (`tests/results/`).
 
 ## 1. What the traces showed
 - **The biggest risk was in the data, not the model.** The brief describes the task board as "3 Done … the rest To Do", but the CSV has 5 Done, 3 In Progress, 1 Blocked and 16 To Do. Any design that lets the LLM count, or that prompts it with the brief's description, fails T10. Moving all counting and date maths into the *Compute Facts* code node removed this whole class of error.
 - **Routing ambiguity is a real failure mode.** "Which tasks are … *at risk* of missing their deadline" looks like a *risk* request to a classifier. I added an explicit disambiguation rule (task delivery = milestone; risk register = risk) and re-ran the suite to confirm the fix.
 - **Hidden edge case.** T006 (Sprint 2, due 21 Apr) is still In Progress on the report date, so it is overdue. The correct T8 answer contains two items, not just the deliberately blocked T024, and T006 is the honest "carry-over" in the Sprint 2 email.
 - **Vague inputs cost almost nothing.** Because vague requests go to a rule-based Clarifier, T2, T4, T6 and T9 cost about $0.00015 each (router only) and cannot hallucinate. An LLM that "tries to help" on vague input produces longer, more expensive and invented output.
-- _[after live run]_ Pass rate: __/12. Failures and the agent responsible (from the Langfuse trace): ______. Change made: ______. Before vs after: ______.
+- **Run 1: 11/12; Run 2: 12/12.** All 12 requests were routed correctly in both runs, and all four vague inputs were refused, each costing $0.00017.
+- **Failure 1, Milestone Tracker (T8):** it reported "4 at risk" but listed 3, silently dropping T009, and used task names without IDs. The per-agent trace showed the input FACTS were correct, so the agent was at fault, not the data. Fix: alert counts passed from code, plus a "one row per alert, ID first" rule. After the fix, all 6 alerts appear with IDs.
+- **Failure 2, Risk Assessor (T7):** it cited the blocked security review as evidence for *Integration* risk and gave a vague "ongoing tasks" justification. Fix: evidence links and the ranking are computed in code, and the agent may only quote them. After the fix, R09 → R01 → R05 with correct evidence, at 40% lower cost.
+- **Lesson about evaluators:** my own Grounding Check passed both failures. It caught *invented* IDs, not *missing* or *mislinked* ones. Adding completeness checks and manual review of every output was what exposed them. An automatic metric is only as good as the failure modes it was designed for.
 
 ## 2. Improvement plan
 1. **Ask Mira questions in Slack.** Front-end the webhook with the existing n8n Slack bot, threaded per project. Acknowledge immediately to stay within Slack's 3-second limit.

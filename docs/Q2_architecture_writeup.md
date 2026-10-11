@@ -47,7 +47,21 @@ Two design decisions make the router reliable:
 **At-risk rules (documented, deterministic):** Blocked = status Blocked · Overdue = not Done and past due · At risk = In Progress due within 7 days, or To Do due within 14 days. **Health:** RED if ≥3 blocked+overdue, AMBER if ≥1, else GREEN.
 
 ## 6. Cost analysis
-Input tokens below are **exact** (o200k tokenizer on Mira's actual prompts + data); output tokens are estimates to be replaced by the measured values from the test run (Mira returns per-agent tokens and cost in every response). Prices (OpenAI list, per 1M tokens): gpt-4o-mini $0.15 in / $0.60 out.
+**Measured on the live run** (n8n Cloud, gpt-4o-mini, 12 baseline inputs, Run 2). Mira returns per-agent tokens and cost in every response. Prices (OpenAI list, per 1M tokens): gpt-4o-mini $0.15 in / $0.60 out.
+
+| Test | Route | Tokens in / out | Cost | Latency |
+|---|---|---|---|---|
+| T1 plan | Planner | 3,883 / 1,036 | $0.00120 | 10.9 s |
+| T3 risk assessment | Risk Assessor | 3,532 / 916 | $0.00108 | 10.6 s |
+| T7 top-3 risks | Risk Assessor | 3,530 / 294 | $0.00071 | 3.3 s |
+| T5 sprint status | Status Reporter | 2,545 / 447 | $0.00065 | 4.4 s |
+| T10 status counts | Status Reporter | 4,067 / 158 | $0.00071 | 2.3 s |
+| T8 / T11 milestones | Milestone Tracker | 2,842 / 632 | $0.00080 | 6.3–7.9 s |
+| T12 stakeholder email | Stakeholder Update | 1,452 / 224 | $0.00035 | 3.3 s |
+| T2/T4/T6/T9 vague | Clarifier (router only) | ~772 / ~95 | $0.00017 | 1.3–1.9 s |
+| **All 12** | | | **$0.0070 total · $0.00058 avg** | p50 3.3 s · max 10.9 s |
+
+The estimates made before the run, using exact prompt tokens and estimated outputs, were within about 10% of these measured values.
 
 | Request type | Router in/out | Specialist in / out (est.) | Cost per request |
 |---|---|---|---|
@@ -61,9 +75,9 @@ Input tokens below are **exact** (o200k tokenizer on Mira's actual prompts + dat
 
 | Cost item | Estimate |
 |---|---|
-| Average cost per request (mix below) | ~$0.0009 |
+| Average cost per request (measured: $0.00058 across the 12 tests; $0.00079 for LLM-answered requests) | ~$0.0008 |
 | Requests per PM per day | 15 (e.g. 3 status, 4 milestone checks, 2 stakeholder updates, 2 risk questions, 1 plan/week, 3 ad-hoc incl. vague) |
-| **Cost per PM per day** | **~$0.014** → **~$0.30 per month** (22 working days) |
+| **Cost per PM per day** | **~$0.012** → **~$0.26 per month** (22 working days) |
 | Same mix with gpt-4o for all specialist agents | ~$0.01 per request → ~$3.30 per PM per month |
 | Data/API calls | CSV parsing in n8n — no API cost; Trello/Jira APIs free at this volume |
 | Langfuse | Free Hobby tier (50k units/month): ~6 events per request × 15 × 22 ≈ 2k per PM per month; a 10-PM pilot ≈ 20k |
@@ -90,4 +104,18 @@ Input tokens below are **exact** (o200k tokenizer on Mira's actual prompts + dat
 - **T006 is the hidden test.** Besides the deliberately blocked T024, T006 (Sprint 2, due 21 Apr) is still In Progress as of 24 Apr, so it is overdue and is also the correct "carry-over" in the Sprint 2 stakeholder email.
 - **Grounding Check verified** with an injected hallucination (fake task T099, risk R13, an unknown date and an out-of-sprint task): all four were flagged.
 
-**From the live baseline run** (see `tests/results/baseline_results.md`): _[fill in after running `tests/run_tests.py` — pass count, any failures, the trace where it happened, the prompt change made, and before/after]_.
+**Live baseline runs** (n8n Cloud, gpt-4o-mini). Results are in `tests/results/` (`run1_baseline_results.md` and `baseline_results.md`).
+
+| | Run 1 (v1) | Run 2 (v2, after fixes) |
+|---|---|---|
+| Automatic keyword checks | 11/12 (T8 failed) | **12/12** |
+| Routed correctly | 12/12 | 12/12 |
+| Vague inputs refused (T2, T4, T6, T9) | 4/4 | 4/4 |
+| Grounding check passed | 12/12 | 12/12 |
+| Manual review issues | 2 (T7, T8) | 0 |
+| Total cost of 12 tests | $0.0074 | $0.0070 |
+
+**What went wrong in Run 1, and the fix (the evaluate → fix → re-evaluate loop):**
+1. **T8 omitted a task.** The Milestone Tracker said "4 tasks at risk" but listed only 3 (it dropped T009). It also named tasks without IDs, so "T024" never appeared literally. **Fix:** code now passes `alert_counts`; the prompt requires the task ID in every row and a row count equal to `total_task_alerts`. **After:** all 6 alerts listed with IDs (T024, T006, T007, T008, T009, T025).
+2. **T7 linked evidence to the wrong risk.** The blocked *security* review (T024) was cited as evidence for R02 *Integration*, and R04 was justified with "ongoing tasks related to stakeholder engagement", which cites no task. The top-3 also disagreed with T3. **Fix:** risk-to-task evidence links and the ranking are now computed in code (security → R09, compliance/legal → R05, data → R01, vendor/platform → R10, and so on; score = Blocked 30 / Overdue 20 / At risk 10 + priority). The agent may only quote those links. **After:** R09 (T024 blocked) → R01 (T006 overdue) → R05 (T025 at risk), with consistent evidence, and the answer is 70% shorter ($0.0012 → $0.0007).
+3. **The evaluator had a blind spot.** The Grounding Check passed both failures, because it detected *invented* IDs but not *omitted* or *mislinked* ones. **Fix:** added completeness checks (every alert task in milestone answers, every in-scope task in sprint reports and emails). Mislinked evidence is now prevented by construction rather than detected afterwards.

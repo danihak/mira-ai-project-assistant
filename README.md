@@ -50,6 +50,7 @@ Tested on n8n **2.42.6**. Uses only core nodes (Webhook, Code, HTTP Request, Swi
 6. **Run the baseline test dataset** (Python 3, standard library only):
    ```bash
    python3 tests/run_tests.py --url https://<your-n8n>/webhook/mira
+   # or score saved responses: python3 tests/run_tests.py --from-json tests/results/run2_results.json
    ```
    This writes `tests/results/baseline_results.md`: the documentation table per test (input, output, expected keywords present or missing, hallucination check, pass/fail) plus a summary with tokens, cost and latency.
 
@@ -77,7 +78,7 @@ Change a prompt in `prompts/` or code in `workflow/src/`, run `python3 workflow/
 - [x] Architecture diagram — `diagram/mira_architecture.png`
 - [x] Write-up with tool rationale, pattern, agents, cost analysis and metrics — `docs/Q2_architecture_writeup.md`
 - [x] Q1 Ideation, Q3 Program Charter, Q4 Reflection — `docs/`
-- [ ] Baseline results (all 12) — run `tests/run_tests.py` → `tests/results/`
+- [x] Baseline results (all 12), two live runs: `tests/results/run1_baseline_results.md` (11/12) → `tests/results/baseline_results.md` (12/12 after fixes)
 - [ ] Screenshots — workflow canvas, Mira in action (n8n *Executions* view), Langfuse traces → `screenshots/`
 - [ ] Slide deck
 - [ ] Public GitHub link submitted
