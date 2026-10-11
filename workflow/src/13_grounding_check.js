@@ -77,7 +77,10 @@ const span = (name, parent, start, end, type, attrs) => ({
   attributes: [attr('langfuse.observation.type', type), ...attrs], status: {},
 });
 const endIso = new Date().toISOString();
-const tags = ['mira', `route:${router.route}`, grounding.passed ? 'grounded' : 'grounding-flags'];
+const tags = ['mira', `route:${router.route}`, `channel:${ctx.channel || 'webhook'}`, grounding.passed ? 'grounded' : 'grounding-flags', ...(ctx.test_id ? [`test:${ctx.test_id}`] : [])];
+// The exact source data the specialist agent saw - a constant-named span so an LLM judge can check faithfulness against it
+const specialist = ctx.calls[ctx.calls.length - 1];
+const agentContext = Array.isArray(specialist.input) ? (specialist.input.find(m => m.role === 'user') || {}).content : `REQUEST: ${ctx.message} (handled by rule-based Clarifier, no source data used)`;
 const spans = [
   span('mira-request', null, ctx.started_at, endIso, 'agent', [
     attr('langfuse.trace.name', 'mira-request'), attr('langfuse.trace.tags', tags),
@@ -85,8 +88,9 @@ const spans = [
     attr('langfuse.observation.input', ctx.message), attr('langfuse.observation.output', answer),
     attr('langfuse.trace.metadata.test_id', ctx.test_id || ''), attr('langfuse.trace.metadata.route', router.route),
     attr('langfuse.trace.metadata.grounded', String(grounding.passed)), attr('langfuse.trace.metadata.cost_usd', String(totals.cost_usd)),
-    attr('langfuse.trace.metadata.as_of_date', facts.report_date),
+    attr('langfuse.trace.metadata.as_of_date', facts.report_date), attr('langfuse.trace.metadata.channel', ctx.channel || 'webhook'),
   ]),
+  span('Agent Context', rootId, ctx.started_at, ctx.started_at, 'span', [attr('langfuse.observation.input', agentContext)]),
   span('Compute Facts (code)', rootId, ctx.started_at, new Date(Date.parse(ctx.started_at) + (ctx.facts_ms || 1)).toISOString(), 'span', [
     attr('langfuse.observation.output', { status_counts: facts.status_counts, health: facts.health, blocked: facts.blocked.map(t => t.id), overdue: facts.overdue.map(t => t.id) }),
   ]),

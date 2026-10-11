@@ -7,7 +7,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "workflow" / "src"
 LOCAL_TEST = "--local-test" in sys.argv  # bakes in local credential ids + mock OpenAI URL for CI-style testing
 
-def read(p): return (ROOT / p).read_text(encoding="utf-8")
+V1 = "--v1" in sys.argv  # experiment build: original v1 Risk/Milestone prompts + context code, same evaluator
+V1_DIR = ROOT / "workflow" / "experiments" / "v1"
+def read(p):
+    if V1 and (V1_DIR / pathlib.Path(p).name).exists():
+        return (V1_DIR / pathlib.Path(p).name).read_text(encoding="utf-8")
+    return (ROOT / p).read_text(encoding="utf-8")
 
 prompts = {
     "__PROMPT_ORCHESTRATOR__": read("prompts/01_orchestrator.md"),
@@ -25,7 +30,7 @@ files = {
 }
 
 def code(fname):
-    s = (SRC / fname).read_text(encoding="utf-8")
+    s = ((V1_DIR / fname) if V1 and (V1_DIR / fname).exists() else (SRC / fname)).read_text(encoding="utf-8")
     for k, v in prompts.items():
         s = s.replace(k, json.dumps(v))
     s = s.replace("__FILES__", json.dumps(files, indent=1))
@@ -79,8 +84,8 @@ sticky("Note: Agents", "## 4. Specialist agents\nEach gets only the data it need
 sticky("Note: Eval", "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then sends an OpenTelemetry trace + a grounded score to Langfuse.", (2400, 260), 1180, 420, 3)
 
 wh = node("Webhook", "n8n-nodes-base.webhook", 2, (0, Y),
-          {"httpMethod": "POST", "path": "mira", "responseMode": "responseNode", "options": {}},
-          webhookId=str(uuid.uuid5(uuid.NAMESPACE_DNS, "mira-webhook")))
+          {"httpMethod": "POST", "path": "mira-v1" if V1 else "mira", "responseMode": "responseNode", "options": {}},
+          webhookId=str(uuid.uuid5(uuid.NAMESPACE_DNS, "mira-webhook-v1" if V1 else "mira-webhook")))
 chat = node("Chat with Mira", "@n8n/n8n-nodes-langchain.chatTrigger", 1.1, (0, Y + 200), {
     "public": True, "mode": "hostedChat",
     "initialMessages": "Hi, I'm Mira - your project intelligence assistant for the ABCDE Ltd. AI Adoption Project.\nTry: 'Which tasks are blocked or at risk?', 'Top 3 risks?', 'Status report for Sprint 3', 'Stakeholder email for Sprint 2' or 'Generate a project plan'.",
@@ -146,13 +151,15 @@ resp = node("Respond to Webhook", "n8n-nodes-base.respondToWebhook", 1.1, (3440,
     "responseBody": "={{ JSON.stringify($('Grounding Check').first().json.response) }}",
     "options": {}})
 
-for a, b in [(wh, c1), (chat, c1), (c1, c2), (c2, c3), (c3, c4), (c4, orch), (orch, c5), (c5, sw), (pkg, gc), (gc, iff), (lf, lfs), (lfs, resp)]:
+if V1:
+    nodes[:] = [n for n in nodes if n["name"] != "Chat with Mira"]
+for a, b in [(wh, c1)] + ([] if V1 else [(chat, c1)]) + [ (c1, c2), (c2, c3), (c3, c4), (c4, orch), (orch, c5), (c5, sw), (pkg, gc), (gc, iff), (lf, lfs), (lfs, resp)]:
     connect(a, b)
 connect(iff, lf, 0)
 connect(iff, resp, 1)
 
 wf = {
-    "name": "Mira - AI Project Intelligence Assistant",
+    "name": "Mira v1 (experiment baseline)" if V1 else "Mira - AI Project Intelligence Assistant",
     "nodes": nodes, "connections": connections,
     "settings": {"executionOrder": "v1"},
     "pinData": {}, "active": False,
@@ -161,6 +168,6 @@ wf = {
 }
 if LOCAL_TEST:
     wf["id"] = "miraLocalTest01"
-out = ROOT / "workflow" / ("mira_workflow.local-test.json" if LOCAL_TEST else "mira_workflow.json")
+out = ROOT / "workflow" / ("mira_workflow.local-test.json" if LOCAL_TEST else "experiments/mira_workflow_v1.json" if V1 else "mira_workflow.json")
 out.write_text(json.dumps(wf, indent=2), encoding="utf-8")
 print("wrote", out, len(nodes), "nodes")
