@@ -1,0 +1,110 @@
+{
+  "name": "Mira - Langfuse dataset setup (run once)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Run once",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cloud.langfuse.com/api/public/v2/datasets",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"name\": \"mira-baseline\", \"description\": \"Mira capstone - 12 baseline test inputs with expected output criteria\", \"metadata\": {\"source\": \"Problem Statement - Mira, baseline test dataset\"}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Create dataset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [\n {\n  \"id\": \"mira-T1\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a project plan for the AI Adoption Project at ABCDE Ltd. Use the provided project description.\"\n  },\n  \"expectedOutput\": \"Phases, milestones, timeline; grounded in description; no invented goals\",\n  \"metadata\": {\n   \"test_id\": \"T1\",\n   \"type\": \"Plan (detailed)\"\n  }\n },\n {\n  \"id\": \"mira-T2\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a project plan for: \\\"We want to build a chatbot.\\\"\"\n  },\n  \"expectedOutput\": \"Flags insufficient detail; asks for scope, timeline, team size; no full plan\",\n  \"metadata\": {\n   \"test_id\": \"T2\",\n   \"type\": \"Plan (vague)\"\n  }\n },\n {\n  \"id\": \"mira-T3\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a risk assessment for the AI Adoption Project at ABCDE Ltd. Use the provided project description.\"\n  },\n  \"expectedOutput\": \"Categorised risks relevant to logistics/AI; no generic risks\",\n  \"metadata\": {\n   \"test_id\": \"T3\",\n   \"type\": \"Risk (detailed)\"\n  }\n },\n {\n  \"id\": \"mira-T4\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a risk assessment for: \\\"New project starting soon.\\\"\"\n  },\n  \"expectedOutput\": \"Flags insufficient; asks for project details; no invented risks\",\n  \"metadata\": {\n   \"test_id\": \"T4\",\n   \"type\": \"Risk (vague)\"\n  }\n },\n {\n  \"id\": \"mira-T5\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a weekly status report using the sample task board data for Sprint 3.\"\n  },\n  \"expectedOutput\": \"Tasks by status; actual Sprint 3 task names; no invented tasks\",\n  \"metadata\": {\n   \"test_id\": \"T5\",\n   \"type\": \"Status (data)\"\n  }\n },\n {\n  \"id\": \"mira-T6\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a weekly status report for: \\\"Things are going fine.\\\"\"\n  },\n  \"expectedOutput\": \"States no task data available; no fabricated statuses or percentages\",\n  \"metadata\": {\n   \"test_id\": \"T6\",\n   \"type\": \"Status (no data)\"\n  }\n },\n {\n  \"id\": \"mira-T7\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"What are the top 3 risks for the ABCDE Ltd project based on the risk data?\"\n  },\n  \"expectedOutput\": \"References actual risks from the risk CSV; none invented\",\n  \"metadata\": {\n   \"test_id\": \"T7\",\n   \"type\": \"Risk analysis\"\n  }\n },\n {\n  \"id\": \"mira-T8\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Which tasks are blocked or at risk of missing their deadline based on the task board?\"\n  },\n  \"expectedOutput\": \"Identifies T024 (Blocked); checks due dates against progress\",\n  \"metadata\": {\n   \"test_id\": \"T8\",\n   \"type\": \"Tracking\"\n  }\n },\n {\n  \"id\": \"mira-T9\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a project plan for a 2-week project with no details provided.\"\n  },\n  \"expectedOutput\": \"Asks for scope, goals, deliverables; no plan from a duration alone\",\n  \"metadata\": {\n   \"test_id\": \"T9\",\n   \"type\": \"Plan (edge)\"\n  }\n },\n {\n  \"id\": \"mira-T10\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Summarize the current project status: how many tasks are done, in progress, and to do?\"\n  },\n  \"expectedOutput\": \"Counts match the task board CSV\",\n  \"metadata\": {\n   \"test_id\": \"T10\",\n   \"type\": \"Status summary\"\n  }\n },\n {\n  \"id\": \"mira-T11\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"What milestones are coming up in the next 2 weeks based on the timeline?\"\n  },\n  \"expectedOutput\": \"Actual milestones from project_timeline.csv; none invented\",\n  \"metadata\": {\n   \"test_id\": \"T11\",\n   \"type\": \"Timeline\"\n  }\n },\n {\n  \"id\": \"mira-T12\",\n  \"datasetName\": \"mira-baseline\",\n  \"input\": {\n   \"message\": \"Generate a stakeholder update email summarizing Sprint 2 progress.\"\n  },\n  \"expectedOutput\": \"References Sprint 2 tasks; professional; no Sprint 3+ tasks\",\n  \"metadata\": {\n   \"test_id\": \"T12\",\n   \"type\": \"Comms\"\n  }\n }\n];\nreturn items.map(i => ({ json: i }));"
+      },
+      "name": "12 baseline items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cloud.langfuse.com/api/public/dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "Create dataset items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Run once": {
+      "main": [
+        [
+          {
+            "node": "Create dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create dataset": {
+      "main": [
+        [
+          {
+            "node": "12 baseline items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 baseline items": {
+      "main": [
+        [
+          {
+            "node": "Create dataset items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

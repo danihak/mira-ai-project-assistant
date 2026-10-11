@@ -114,4 +114,7 @@ const footer = router.route === 'clarify'
   : `_Mira · route: ${router.route} · grounding: ${grounding.passed ? 'passed ✓' : 'FLAGS: ' + flags.join('; ')} · ${totals.input_tokens + totals.output_tokens} tokens · $${totals.cost_usd.toFixed(4)} · as of ${facts.report_date}_`;
 response.output = `${answer}\n\n---\n${footer}`;
 
-return [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/otel/v1/traces`, langfuse_body: otel, langfuse_score_url: `${cfg.langfuse_host}/api/public/scores`, langfuse_score_body: score } }];
+const experiment = ctx.experiment ? { runName: ctx.experiment.run_name, datasetItemId: ctx.experiment.dataset_item_id, traceId, metadata: { route: router.route, grounded: grounding.passed, cost_usd: totals.cost_usd } } : null;
+if (experiment) response.experiment = { run_name: experiment.runName, dataset_item_id: experiment.datasetItemId };
+
+return [{ json: { response, experiment, langfuse_dataset_run_url: `${cfg.langfuse_host}/api/public/dataset-run-items`, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/otel/v1/traces`, langfuse_body: otel, langfuse_score_url: `${cfg.langfuse_host}/api/public/scores`, langfuse_score_body: score } }];
