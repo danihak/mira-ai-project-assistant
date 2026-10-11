@@ -57,6 +57,12 @@ Tested on n8n **2.42.6**. Uses only core nodes (Webhook, Code, HTTP Request, Swi
    ```
    This writes `tests/results/baseline_results.md`: the documentation table per test (input, output, expected keywords present or missing, hallucination check, pass/fail) plus a summary with tokens, cost and latency.
 
+## Evaluation in Langfuse
+- **Dataset:** import `workflow/experiments/langfuse_dataset_setup.json` into n8n, attach the Langfuse credential to its two HTTP nodes, and click *Execute workflow* once. It creates the dataset `mira-baseline` (items `mira-T1` … `mira-T12`).
+- **Experiments:** send a test request with `"experiment": {"run_name": "<name>", "dataset_item_id": "mira-T8"}`. Mira links the trace to that dataset run. The v1 comparison workflow is `workflow/experiments/mira_workflow_v1.json` (webhook `/webhook/mira-v1`; rebuild with `python3 workflow/build_workflow.py --v1`).
+- **LLM judge:** in Langfuse, Evaluators → `faithfulness` (gpt-4.1-mini, score 0–1), with a rule on observations `type:GENERATION -name:Orchestrator`. It needs an OpenAI LLM connection in Langfuse settings.
+- **Dashboard:** "Mira - Production Metrics" shows scores, score trend, latency percentiles per agent, cost per agent and request mix.
+
 ## Configuration (node *Config + Input*)
 | Setting | Default | Why |
 |---|---|---|

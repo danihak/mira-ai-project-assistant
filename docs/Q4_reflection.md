@@ -19,10 +19,12 @@
 2. **Live data instead of CSV.** Replace *Load Project Data* with Trello/Jira and Google Drive nodes. The agents don't change, because they only consume *Compute Facts*.
 3. **Scheduled alerts.** Run the Milestone Tracker every morning per project and post only when something changed (new blocked or overdue item, milestone within 7 days).
 4. **Human-in-the-loop.** Plans and stakeholder emails go to the PM for one-click approval before sending. Grounding flags are shown inline.
-5. **LLM-as-judge.** Add a second evaluator (gpt-4o, sampled at 10%) that scores each plan for "goal invented?" and "generic risk?", alongside the deterministic grounding check, and log it to Langfuse as a score.
+5. **LLM-as-judge (done).** A `faithfulness` judge (gpt-4.1-mini) now scores every specialist answer in Langfuse against the exact source data the agent saw. **Next:** sample it at 10–20% plus 100% of code-flagged answers, because the dashboard shows it costs more than Mira itself.
 6. **Multi-project support.** Key the data and facts by project ID so one PM can ask "which of my projects is red?"
 
 ## 3. Evaluation and fine-tuning
+**Experiments in Langfuse.** The 12 baseline inputs are a Langfuse dataset. I re-ran them live through the original v1 prompts and the current v2, with the same evaluator. v1 reproduced its failures on a fresh run (T8 dropped T009 again; T7 again tied the security blocker to Integration risk), while v2 passed 12/12. Being able to reproduce a failure, then show the fix removing it on the same inputs, is the strongest evidence the fix is real and not luck.
+
 The course loop is *evaluate → find failure → fix → re-evaluate*. Mira bakes the first step into every request: the Grounding Check records a `grounded` score (0/1) on every Langfuse trace, so groundedness becomes a production metric, not a one-off test. The 12 baseline inputs are the regression suite, and any prompt or model change must pass them again.
 
 Fine-tuning comes **after** prompt and architecture fixes, and only for the agent that still fails. The most likely candidate is the Planner, which has the most free text and the most room to add "helpful" goals. The plan:
