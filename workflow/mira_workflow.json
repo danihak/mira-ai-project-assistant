@@ -1,0 +1,960 @@
+{
+  "name": "Mira - AI Project Intelligence Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 1. Input & config\nPOST /webhook/mira with `{\"message\": \"...\"}`.\nAll settings (as-of date, models, prices, Langfuse) live in **Config + Input**.",
+        "width": 460,
+        "height": 420,
+        "color": 7
+      },
+      "id": "8b4ed948-7a36-53fa-a15e-3e068d76316c",
+      "name": "Note: Input",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Deterministic data layer\nProject files are parsed and every count, date and risk flag is computed **in code**. LLMs never do arithmetic.",
+        "width": 460,
+        "height": 420,
+        "color": 5
+      },
+      "id": "a2913e2c-09c5-5dcd-966f-a80429f72561",
+      "name": "Note: Data",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        440,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Orchestrator (Router pattern)\nCheap model classifies intent + checks if there is enough data. Code guardrails override the model.",
+        "width": 880,
+        "height": 420,
+        "color": 6
+      },
+      "id": "d225a184-56a7-5ce8-92bb-46f9c09d59a6",
+      "name": "Note: Router",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        920,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Specialist agents\nEach gets only the data it needs. Vague inputs go to a rule-based Clarifier - no LLM, no guessing.",
+        "width": 520,
+        "height": 1240,
+        "color": 4
+      },
+      "id": "c909c55f-4d68-525f-9aa5-f20558d58a85",
+      "name": "Note: Agents",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then logs trace + generations + score to Langfuse.",
+        "width": 980,
+        "height": 420,
+        "color": 3
+      },
+      "id": "0a683580-fe69-5c12-b374-99255379aee3",
+      "name": "Note: Eval",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mira",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3b548a7c-446d-5312-88f4-481d02849363",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        460
+      ],
+      "webhookId": "f8e51b55-387d-5c98-9957-e48991052f2d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Config + Input \u2014 single place to change settings. Normalises the request from Webhook (or Slack/chat later).\nconst item = $input.first().json;\nconst body = item.body || {};\nconst query = item.query || {};\nconst message = String(body.message || body.chatInput || body.text || query.message || '').trim();\n\nconst config = {\n  // \"Today\" for the project. The sample task board runs Apr\u2013Aug 2026 and Sprint 3 is the active sprint,\n  // so reports are generated as of Fri 24 Apr 2026 (end of timeline week 4). Change here, or pass \"as_of_date\" in the request.\n  as_of_date: body.as_of_date || '2026-04-24',\n  project_start: '2026-03-30',          // Monday of timeline week 1 (matches Sprint 1 due dates of 7\u201310 Apr)\n  at_risk_days_in_progress: 7,          // In Progress task due within N days => at risk\n  at_risk_days_todo: 14,                // To Do (not started) task due within N days => at risk\n  milestone_window_days: 14,            // \"upcoming\" milestone window\n  openai_base_url: 'https://api.openai.com/v1',\n  router_model: 'gpt-4o-mini',\n  specialist_model: 'gpt-4o-mini',\n  // USD per 1M tokens (OpenAI list prices) \u2014 used for per-request cost reporting\n  prices: {\n    'gpt-4o-mini': { input: 0.15, output: 0.60 },\n    'gpt-4.1-mini': { input: 0.40, output: 1.60 },\n    'gpt-4o': { input: 2.50, output: 10.00 },\n    'gpt-4.1': { input: 2.00, output: 8.00 },\n  },\n  langfuse_enabled: false,              // set true after adding the Langfuse Basic Auth credential\n  langfuse_host: 'https://cloud.langfuse.com',\n};\n\nreturn [{\n  json: {\n    config,\n    message,\n    test_id: body.test_id || null,\n    session_id: body.session_id || null,\n    trace_id: $execution.id ? `mira-${$execution.id}-${Date.now()}` : `mira-${Date.now()}`,\n    started_at: new Date().toISOString(),\n    started_ms: Date.now(),\n  },\n}];\n"
+      },
+      "id": "a094d84c-222a-5b1d-a880-87c00eb57c5a",
+      "name": "Config + Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load Project Data \u2014 the grounding source. The four project files are embedded so the workflow runs anywhere\n// (n8n Cloud or self-hosted). To use live data instead, replace this node with Read File / Google Drive / Trello nodes\n// that output the same { description, timeline, risks, tasks } shape.\nconst FILES = {\n \"description\": \"AI Adoption Project Description for ABCDE Ltd.\\n\\nABCDE Ltd., a mid-sized enterprise specializing in logistics and supply chain solutions, is embarking on an AI adoption initiative to enhance operational efficiency, improve customer experience, and drive data-driven decision-making across the organization. This project will focus on integrating AI-powered tools into core business functions, including demand forecasting, route optimization, inventory management, and customer support. By leveraging machine learning models and natural language processing, the company aims to reduce manual overhead, minimize errors, and uncover actionable insights from historical and real-time data.\\n\\nThe AI adoption project will be implemented in phases, beginning with a detailed assessment of current workflows and data infrastructure, followed by pilot implementations in targeted departments. Key goals include reducing delivery delays by 15%, lowering operational costs by 10%, and improving service responsiveness. A cross-functional task force comprising data scientists, IT professionals, and business stakeholders will oversee the deployment and ensure alignment with organizational objectives. This strategic move is expected to position ABCDE Ltd. as a technology-forward leader in the logistics industry.\",\n \"timeline\": \"phase,phase_name,start_week,end_week,key_activities,milestones_deliverables\\n1,Project Initiation,1,2,\\\"Define project scope; Form cross-functional team; Initial stakeholder meeting\\\",\\\"Project charter signed off; Team structure finalized\\\"\\n2,Current State Analysis,3,4,\\\"Assess existing processes & systems; Identify data sources & gaps\\\",\\\"Current systems audit report; Gap analysis report\\\"\\n3,Use Case Selection,5,6,\\\"Shortlist priority AI use cases (forecasting, route optimization)\\\",\\\"Final list of prioritized use cases with success criteria\\\"\\n4,Pilot Design,7,10,\\\"Data collection & preparation; Model design and development\\\",\\\"Working prototype models; Data pipelines established\\\"\\n5,Pilot Implementation,11,14,\\\"Deploy AI models in test environments; Monitor performance\\\",\\\"Pilot results report; User feedback and performance metrics\\\"\\n6,Evaluation & Iteration,15,16,\\\"Evaluate pilot outcomes; Adjust models as needed\\\",\\\"Updated models and process refinements\\\"\\n7,Full Deployment,17,22,\\\"Scale AI models across selected departments; Train staff\\\",\\\"Full production rollout; Training sessions completed\\\"\\n8,Monitoring & Review,23,24,\\\"Continuous performance monitoring; Final project review\\\",\\\"Project closure report; Recommendations for future scaling\\\"\\n\",\n \"risks\": \"risk_id,category,risk_challenge,impact,mitigation_strategy\\nR01,Data Quality & Availability,Incomplete or unstructured data,Poor model performance and inaccurate outcomes,Perform early data audits and implement robust data governance\\nR02,Integration Issues,Difficulty integrating AI with legacy systems,Delays in deployment and operational disruptions,Plan integration roadmap and use APIs/middleware\\nR03,Talent & Skills Gap,Lack of internal AI/ML expertise,Overreliance on external vendors and slow progress,Provide staff training and hire specialized talent\\nR04,Change Resistance,Employees resist adopting AI-driven workflows,Low adoption and reduced ROI,Strong change management and early engagement\\nR05,Ethical & Legal Concerns,Risks of biased models or data privacy violations,Legal repercussions and reputational damage,Involve legal early and implement fairness checks\\nR06,Cost Overruns,Underestimation of AI development costs,Budget constraints and project delays,Set realistic budget and build in contingency funds\\nR07,Unrealistic Expectations,Stakeholders expect immediate ROI,Disillusionment and loss of support,Align expectations and show quick wins\\nR08,Model Performance Drift,AI models lose accuracy over time,Incorrect decisions and trust erosion,Regular retraining cycles and monitoring dashboards\\nR09,Security Vulnerabilities,AI models targeted by adversarial attacks,Data breaches and operational risks,Adopt AI security best practices and penetration testing\\nR10,Vendor Lock-in,Overdependence on a specific AI platform,Flexibility loss and future switching costs,Favor open standards and negotiate flexible vendor terms\\n\",\n \"tasks\": \"task_id,task_name,status,assignee,priority,sprint,due_date,labels,description\\nT001,Define project scope and objectives,Done,Arjun Mehta,High,Sprint 1,2026-04-07,Planning,\\\"Document project scope, goals, and success criteria for AI adoption\\\"\\nT002,Form cross-functional task force,Done,Sarah Lin,High,Sprint 1,2026-04-07,Planning,\\\"Identify and onboard team members from data science, IT, and business units\\\"\\nT003,Initial stakeholder alignment meeting,Done,Arjun Mehta,High,Sprint 1,2026-04-10,Planning,\\\"Present project charter and get sign-off from leadership\\\"\\nT004,Audit existing data infrastructure,Done,Priya Nair,High,Sprint 2,2026-04-18,Analysis,\\\"Assess current databases, data pipelines, and data quality\\\"\\nT005,Map current logistics workflows,Done,James Wong,Medium,Sprint 2,2026-04-18,Analysis,\\\"Document end-to-end processes for demand forecasting, routing, and inventory\\\"\\nT006,Identify data gaps and quality issues,In Progress,Priya Nair,High,Sprint 2,2026-04-21,Analysis,\\\"Gap analysis report comparing available data vs requirements for AI models\\\"\\nT007,Shortlist AI use cases,In Progress,Arjun Mehta,High,Sprint 3,2026-04-28,Use Cases,\\\"Evaluate and prioritize: demand forecasting, route optimization, inventory mgmt, customer support\\\"\\nT008,Define success criteria for each use case,To Do,Sarah Lin,High,Sprint 3,2026-05-02,Use Cases,\\\"Set measurable KPIs: 15% reduction in delivery delays, 10% cost reduction\\\"\\nT009,Vendor evaluation for ML platform,To Do,James Wong,Medium,Sprint 3,2026-05-05,Use Cases,\\\"Compare cloud ML platforms (AWS SageMaker, Azure ML, GCP Vertex AI)\\\"\\nT010,Collect historical demand data,To Do,Priya Nair,High,Sprint 4,2026-05-12,Data Prep,\\\"Extract 2 years of demand data from ERP system\\\"\\nT011,Data cleaning and preprocessing pipeline,To Do,Priya Nair,High,Sprint 4,2026-05-19,Data Prep,\\\"Build automated pipeline for data cleaning, normalization, feature engineering\\\"\\nT012,Design demand forecasting model,To Do,Ravi Kumar,High,Sprint 4,2026-05-19,Model Dev,\\\"Select algorithm (LSTM, Prophet, XGBoost), define input features\\\"\\nT013,Design route optimization model,To Do,Ravi Kumar,Medium,Sprint 5,2026-05-26,Model Dev,\\\"Graph-based optimization with constraints (time windows, vehicle capacity)\\\"\\nT014,Build model training pipeline,To Do,Ravi Kumar,High,Sprint 5,2026-06-02,Model Dev,\\\"Automated training, validation, and model versioning\\\"\\nT015,Deploy demand model to test environment,To Do,James Wong,High,Sprint 6,2026-06-09,Pilot,\\\"Deploy to staging, set up monitoring, define test scenarios\\\"\\nT016,Run pilot with logistics team,To Do,Arjun Mehta,High,Sprint 6,2026-06-16,Pilot,\\\"2-week pilot with 3 logistics coordinators using demand forecasting predictions\\\"\\nT017,Collect pilot feedback and metrics,To Do,Sarah Lin,High,Sprint 7,2026-06-23,Evaluation,\\\"Survey users, measure prediction accuracy, compare with manual forecasts\\\"\\nT018,Iterate on model based on feedback,To Do,Ravi Kumar,Medium,Sprint 7,2026-06-30,Evaluation,\\\"Adjust features, retrain model, validate improvements\\\"\\nT019,Prepare production deployment plan,To Do,James Wong,High,Sprint 8,2026-07-07,Deployment,\\\"Infrastructure scaling, rollback plan, monitoring setup\\\"\\nT020,Staff training program,To Do,Sarah Lin,Medium,Sprint 8,2026-07-14,Deployment,\\\"Train 25 logistics staff on using AI-powered forecasting dashboard\\\"\\nT021,Full production rollout,To Do,Arjun Mehta,High,Sprint 9,2026-07-21,Deployment,\\\"Go-live for demand forecasting across all 3 distribution centers\\\"\\nT022,Set up continuous monitoring,To Do,Priya Nair,High,Sprint 9,2026-07-28,Monitoring,\\\"Model performance dashboards, drift detection alerts, retraining triggers\\\"\\nT023,Project closure report,To Do,Arjun Mehta,Medium,Sprint 10,2026-08-04,Monitoring,\\\"Final report: outcomes vs targets, lessons learned, recommendations for Phase 2\\\"\\nT024,Security review of AI infrastructure,Blocked,James Wong,High,Sprint 5,2026-05-26,Security,\\\"Penetration testing and vulnerability assessment - BLOCKED: waiting for security team availability\\\"\\nT025,Legal review of data usage,In Progress,Sarah Lin,High,Sprint 3,2026-04-28,Compliance,\\\"Review data privacy compliance for using customer delivery data in ML models\\\"\\n\"\n};\n\nfunction parseCSV(text) {\n  const rows = [];\n  let row = [], field = '', inQuotes = false;\n  for (let i = 0; i < text.length; i++) {\n    const c = text[i];\n    if (inQuotes) {\n      if (c === '\"' && text[i + 1] === '\"') { field += '\"'; i++; }\n      else if (c === '\"') inQuotes = false;\n      else field += c;\n    } else if (c === '\"') inQuotes = true;\n    else if (c === ',') { row.push(field); field = ''; }\n    else if (c === '\\n' || c === '\\r') {\n      if (c === '\\r' && text[i + 1] === '\\n') i++;\n      row.push(field); field = '';\n      if (row.some(v => v !== '')) rows.push(row);\n      row = [];\n    } else field += c;\n  }\n  row.push(field);\n  if (row.some(v => v !== '')) rows.push(row);\n  const header = rows.shift().map(h => h.trim());\n  return rows.map(r => Object.fromEntries(header.map((h, i) => [h, (r[i] || '').trim()])));\n}\n\nconst project = {\n  name: 'AI Adoption Project \u2014 ABCDE Ltd.',\n  description: FILES.description.trim(),\n  timeline: parseCSV(FILES.timeline).map(p => ({ ...p, phase: Number(p.phase), start_week: Number(p.start_week), end_week: Number(p.end_week) })),\n  risks: parseCSV(FILES.risks),\n  tasks: parseCSV(FILES.tasks),\n};\n\nreturn [{ json: { ...$input.first().json, project } }];\n"
+      },
+      "id": "29d29d82-5db3-5d3b-99da-83549162a953",
+      "name": "Load Project Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compute Facts \u2014 deterministic project analytics. Counting, filtering and date maths happen HERE, in code,\n// so the LLM agents only format and explain numbers; they never have to calculate them (anti-hallucination design).\nconst t0 = Date.now();\nconst { config: cfg, project: p } = $input.first().json;\nconst DAY = 86400000;\nconst toDate = s => new Date(s + 'T00:00:00Z');\nconst fmt = d => d.toISOString().slice(0, 10);\nconst asOf = toDate(cfg.as_of_date);\nconst start = toDate(cfg.project_start);\nconst STATUSES = ['Done', 'In Progress', 'Blocked', 'To Do'];\nconst sprintNo = s => Number(String(s).replace(/\\D/g, '')) || 0;\n\nconst tasks = p.tasks.map(t => ({\n  id: t.task_id, name: t.task_name, status: t.status, assignee: t.assignee, priority: t.priority,\n  sprint: t.sprint, due: t.due_date, label: t.labels, description: t.description,\n  days_to_due: Math.round((toDate(t.due_date) - asOf) / DAY),\n}));\nconst compact = t => ({ id: t.id, name: t.name, status: t.status, assignee: t.assignee, priority: t.priority, sprint: t.sprint, due: t.due, days_to_due: t.days_to_due });\nconst counts = arr => Object.fromEntries([...STATUSES.map(s => [s, arr.filter(t => t.status === s).length]), ['Total', arr.length]]);\n\n// Status counts, whole project and per sprint\nconst status_counts = counts(tasks);\nconst sprints = [...new Set(tasks.map(t => t.sprint))].sort((a, b) => sprintNo(a) - sprintNo(b));\nconst by_sprint = Object.fromEntries(sprints.map(s => {\n  const ts = tasks.filter(t => t.sprint === s);\n  return [s, { counts: counts(ts), tasks: ts.map(compact) }];\n}));\n\n// Delivery signals\nconst blocked = tasks.filter(t => t.status === 'Blocked').map(t => ({ ...compact(t), reason: `Blocked: ${(t.description.split('BLOCKED:')[1] || t.description).trim()}` }));\nconst overdue = tasks.filter(t => t.status !== 'Done' && t.days_to_due < 0)\n  .map(t => ({ ...compact(t), reason: `Overdue by ${-t.days_to_due} day(s), still ${t.status}` }));\nconst at_risk = tasks.filter(t => t.days_to_due >= 0 && (\n  (t.status === 'In Progress' && t.days_to_due <= cfg.at_risk_days_in_progress) ||\n  (t.status === 'To Do' && t.days_to_due <= cfg.at_risk_days_todo)))\n  .map(t => ({ ...compact(t), reason: `Due in ${t.days_to_due} day(s), still ${t.status}` }));\nconst at_risk_rules = `Blocked = status Blocked; Overdue = not Done and due date before ${cfg.as_of_date}; At risk = In Progress and due within ${cfg.at_risk_days_in_progress} days, or To Do and due within ${cfg.at_risk_days_todo} days.`;\n\n// Timeline -> dated phases and milestones (week 1 starts on project_start)\nconst phases = p.timeline.map(ph => {\n  const s = new Date(start.getTime() + (ph.start_week - 1) * 7 * DAY);\n  const e = new Date(start.getTime() + (ph.end_week * 7 - 1) * DAY);\n  const schedule_status = e < asOf ? 'Past (scheduled end date passed)' : (s <= asOf ? 'Current' : 'Upcoming');\n  return {\n    phase: ph.phase, name: ph.phase_name, weeks: `${ph.start_week}-${ph.end_week}`, start_date: fmt(s), end_date: fmt(e),\n    schedule_status, key_activities: ph.key_activities, milestones: ph.milestones_deliverables.split(';').map(m => m.trim()).filter(Boolean),\n  };\n});\nconst milestones = phases.flatMap(ph => ph.milestones.map(m => ({\n  milestone: m, phase: `${ph.phase}. ${ph.name}`, due: ph.end_date, days_to_due: Math.round((toDate(ph.end_date) - asOf) / DAY),\n})));\nconst upcoming_milestones = milestones.filter(m => m.days_to_due >= 0 && m.days_to_due <= cfg.milestone_window_days);\nconst next_after_window = milestones.filter(m => m.days_to_due > cfg.milestone_window_days).slice(0, 3);\nconst current_phase = phases.find(ph => ph.schedule_status === 'Current') || null;\nconst project_end = phases.length ? phases[phases.length - 1].end_date : null;\n\n// Current sprint = sprint of the earliest open, non-overdue task\nconst open = tasks.filter(t => t.status !== 'Done' && t.days_to_due >= 0).sort((a, b) => a.days_to_due - b.days_to_due);\nconst current_sprint = open.length ? open[0].sprint : null;\n\n// Rule-based health (documented so the LLM never \"decides\" it)\nconst health_reasons = [];\nblocked.forEach(t => health_reasons.push(`${t.id} ${t.name} is Blocked (${t.priority} priority)`));\noverdue.forEach(t => health_reasons.push(`${t.id} ${t.name} is overdue (due ${t.due})`));\nif (at_risk.length) health_reasons.push(`${at_risk.length} task(s) at risk of missing due dates in the next ${cfg.at_risk_days_todo} days`);\nconst issues = blocked.length + overdue.length;\nconst health = issues >= 3 ? 'RED' : issues >= 1 ? 'AMBER' : 'GREEN';\n\n// Data-quality notes surfaced to agents instead of silently \"fixed\"\nconst data_notes = [];\nconst lastDue = tasks.map(t => t.due).sort().pop();\nif (project_end && lastDue < project_end) data_notes.push(`Task board ends ${lastDue}; timeline runs to ${project_end} (week 24). Board and timeline are not fully aligned.`);\n\nconst facts = {\n  report_date: cfg.as_of_date,\n  project_start: cfg.project_start,\n  project_end,\n  status_counts,\n  percent_done: Math.round((status_counts.Done / status_counts.Total) * 100),\n  current_sprint,\n  current_phase,\n  by_sprint,\n  blocked, overdue, at_risk, at_risk_rules,\n  phases, milestones, upcoming_milestones, next_after_window,\n  health, health_reasons,\n  data_notes,\n  all_task_ids: tasks.map(t => t.id),\n  all_risk_ids: p.risks.map(r => r.risk_id),\n};\n\nreturn [{ json: { ...$input.first().json, facts, facts_ms: Date.now() - t0 } }];\n"
+      },
+      "id": "c587e232-70c1-5378-9a5f-96a9f5cc03ae",
+      "name": "Compute Facts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Router Request \u2014 prepares the Orchestrator Agent call (cheap model, temperature 0, JSON mode).\nconst ctx = $input.first().json;\nconst SYSTEM = \"ROLE: You are the Orchestrator of Mira, a project intelligence assistant for PMs/TPMs at Nexora. You do NOT answer the request. You only classify it and decide whether there is enough data to answer it without inventing anything.\\n\\nLOADED PROJECT DATA (the only project Mira has data for):\\n- Project: \\\"AI Adoption Project at ABCDE Ltd.\\\" (logistics / supply chain)\\n- Files: project description, 8-phase 24-week timeline with milestones, risk register (R01-R10), Kanban task board (25 tasks, Sprints 1-10, statuses, assignees, due dates)\\n\\nINPUT: one free-text request from a PM/TPM.\\n\\nOUTPUT: Return ONLY a JSON object with exactly these fields:\\n{\\n  \\\"intent\\\": \\\"plan\\\" | \\\"risk\\\" | \\\"status\\\" | \\\"milestone\\\" | \\\"stakeholder_update\\\" | \\\"unsupported\\\",\\n  \\\"project_ref\\\": \\\"abcde\\\" | \\\"other\\\" | \\\"none\\\",\\n  \\\"sprint\\\": <integer or null>,\\n  \\\"audience\\\": \\\"leadership\\\" | \\\"engineering\\\" | \\\"client\\\" | null,\\n  \\\"user_supplied_details\\\": \\\"<the concrete project facts the user typed themselves, verbatim-ish, or empty string>\\\",\\n  \\\"sufficient\\\": true | false,\\n  \\\"missing_info\\\": [\\\"<what is missing>\\\", ...],\\n  \\\"reason\\\": \\\"<one sentence>\\\"\\n}\\n\\nINTENT RULES:\\n- plan: create a project plan, phases, roadmap, work breakdown.\\n- risk: risk assessment, risk matrix, top risks, what could go wrong.\\n- status: status report, progress summary, counts of done / in progress / to do, sprint summary.\\n- milestone: blocked tasks, tasks at risk of missing deadlines, upcoming / overdue milestones, deadline tracking.\\n- stakeholder_update: an email / update / message for stakeholders, leadership, client or engineering.\\n- unsupported: anything else.\\n- Disambiguation: questions about specific TASKS being blocked, late, overdue or \\\"at risk of missing their deadline\\\" are milestone (delivery tracking), NOT risk. Use risk only for the project's risk register / risk assessment. A question about how many tasks are done / in progress / to do is status.\\n\\nPROJECT_REF RULES:\\n- \\\"abcde\\\" if the request mentions ABCDE, \\\"the AI Adoption Project\\\", \\\"the project\\\", \\\"the task board\\\", \\\"the timeline\\\", \\\"the risk data\\\", \\\"Sprint N\\\", or otherwise clearly refers to the loaded data.\\n- \\\"other\\\" if the user describes a different project in their own words (e.g. a quoted one-liner, \\\"a 2-week project\\\", \\\"a new app\\\").\\n- \\\"none\\\" if no project can be identified at all.\\n\\nSUFFICIENCY RULES (this is the hallucination guardrail - be strict):\\n- project_ref = \\\"abcde\\\": sufficient = true (data is loaded).\\n- project_ref = \\\"other\\\" or \\\"none\\\":\\n  - plan needs ALL of: goal/scope, deliverables, timeline, team or resources. A duration alone is NOT enough.\\n  - risk needs: what the project is (domain, scope, goals) and how it will be delivered (timeline, team, technology).\\n  - status / milestone / stakeholder_update need actual task data (task names with statuses). Opinions like \\\"things are fine\\\" are NOT task data.\\n  - If anything required is missing: sufficient = false and list each missing item in missing_info.\\n- Never assume missing details. Never treat the loaded ABCDE data as belonging to an \\\"other\\\" project.\\n\\nReturn JSON only. No markdown, no commentary.\\n\";\nconst request = {\n  model: ctx.config.router_model,\n  temperature: 0,\n  response_format: { type: 'json_object' },\n  messages: [\n    { role: 'system', content: SYSTEM },\n    { role: 'user', content: `REQUEST: ${ctx.message || '(empty)'}` },\n  ],\n};\nreturn [{ json: { ...ctx, request, router_started_ms: Date.now() } }];\n"
+      },
+      "id": "519da2f0-08cd-5d22-861c-fcfabdeb1311",
+      "name": "Build Router Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config + Input').first().json.config.openai_base_url }}/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "0550c148-1b1b-5920-bcaa-588b9110227f",
+      "name": "Orchestrator Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1180,
+        460
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Route \u2014 reads the Orchestrator's JSON and applies deterministic guardrails on top of it.\nconst ctx = $('Build Router Request').first().json;\nconst resp = $input.first().json;\nconst raw = resp.choices?.[0]?.message?.content || '{}';\nlet r;\ntry { r = JSON.parse(raw); } catch (e) { r = { intent: 'unsupported', project_ref: 'none', sufficient: false, missing_info: ['Router returned invalid JSON'], reason: 'parse error' }; }\n\nconst INTENTS = ['plan', 'risk', 'status', 'milestone', 'stakeholder_update', 'unsupported'];\nconst intent = INTENTS.includes(r.intent) ? r.intent : 'unsupported';\nconst msg = ctx.message || '';\nconst sprintMatch = msg.match(/sprint\\s*(\\d+)/i);\nconst sprint = Number.isInteger(r.sprint) ? r.sprint : (sprintMatch ? Number(sprintMatch[1]) : null);\nlet project_ref = ['abcde', 'other', 'none'].includes(r.project_ref) ? r.project_ref : 'none';\n\n// Guardrails (code wins over the model):\n// 1. Empty message => clarify.  2. Data-dependent intents need loaded data.  3. \"other\" projects must be sufficient.\nlet route = intent;\nconst guardrails = [];\nif (!msg) { route = 'clarify'; guardrails.push('empty request'); }\nelse if (intent === 'unsupported') { route = 'clarify'; guardrails.push('unsupported intent'); }\nelse if (project_ref !== 'abcde') {\n  if (['status', 'milestone', 'stakeholder_update'].includes(intent)) {\n    route = 'clarify'; guardrails.push('no task data supplied for a non-loaded project');\n  } else if (r.sufficient !== true) {\n    route = 'clarify'; guardrails.push('insufficient project detail');\n  }\n}\nif (route === 'stakeholder_update' && sprint && !ctx.facts.by_sprint[`Sprint ${sprint}`]) {\n  route = 'clarify'; guardrails.push(`Sprint ${sprint} not found on the task board`);\n}\n\nconst usage = resp.usage || {};\nconst router = {\n  intent, route, project_ref, sprint, audience: r.audience || null,\n  user_supplied_details: r.user_supplied_details || '', sufficient: r.sufficient === true,\n  missing_info: Array.isArray(r.missing_info) ? r.missing_info : [], reason: r.reason || '', guardrails,\n};\nconst call = {\n  agent: 'Orchestrator', model: resp.model || ctx.config.router_model,\n  input_tokens: usage.prompt_tokens || 0, output_tokens: usage.completion_tokens || 0,\n  latency_ms: Date.now() - ctx.router_started_ms, input: ctx.request.messages, output: raw,\n  start_time: new Date(ctx.router_started_ms).toISOString(), end_time: new Date().toISOString(),\n};\nconst { request, ...rest } = ctx;\nreturn [{ json: { ...rest, router, calls: [call] } }];\n"
+      },
+      "id": "b77b363d-9660-5380-81c1-ee7bfbd13194",
+      "name": "Parse Route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a6a115fa-43b9-538a-8455-e391476acb47",
+                    "leftValue": "={{ $json.router.route }}",
+                    "rightValue": "plan",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "plan"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d76aa2f2-04f7-5b16-b8fc-3a91fb876c5d",
+                    "leftValue": "={{ $json.router.route }}",
+                    "rightValue": "risk",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "risk"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "70a5f0aa-bc5a-56df-9542-83d9403cdda5",
+                    "leftValue": "={{ $json.router.route }}",
+                    "rightValue": "status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "status"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4d802be2-f223-5809-a66f-a26993949083",
+                    "leftValue": "={{ $json.router.route }}",
+                    "rightValue": "milestone",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "milestone"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e8bfac8b-4615-580b-a892-c25e9fe85c25",
+                    "leftValue": "={{ $json.router.route }}",
+                    "rightValue": "stakeholder_update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stakeholder_update"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c4cea90c-0e02-53a0-9211-b99db51dea1b",
+                    "leftValue": "={{ $json.router.route }}",
+                    "rightValue": "clarify",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "clarify"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "54a60ac3-10d6-57d0-a6c8-2855c25ccacb",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1600,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Package Response \u2014 collects the specialist's output (whichever branch ran) with usage and latency.\nconst CONTEXT_NODES = ['Planner Context', 'Risk Context', 'Status Context', 'Milestone Context', 'Stakeholder Context', 'Clarifier (rule-based)'];\nconst ran = CONTEXT_NODES.find(n => { try { return $(n).isExecuted; } catch (e) { return false; } });\nconst ctx = $(ran).first().json;\nconst calls = [...(ctx.calls || [])];\nlet answer;\nif (ran === 'Clarifier (rule-based)') {\n  answer = ctx.rule_based_answer;\n  calls.push({ agent: ctx.agent_name, model: 'none (rule-based)', input_tokens: 0, output_tokens: 0, latency_ms: Date.now() - ctx.agent_started_ms, input: ctx.message, output: answer, start_time: new Date(ctx.agent_started_ms).toISOString(), end_time: new Date().toISOString() });\n} else {\n  const resp = $input.first().json;\n  answer = resp.choices?.[0]?.message?.content || '(no content returned)';\n  const u = resp.usage || {};\n  calls.push({ agent: ctx.agent_name, model: resp.model || ctx.request.model, input_tokens: u.prompt_tokens || 0, output_tokens: u.completion_tokens || 0, latency_ms: Date.now() - ctx.agent_started_ms, input: ctx.request.messages, output: answer, start_time: new Date(ctx.agent_started_ms).toISOString(), end_time: new Date().toISOString() });\n}\nconst { request, rule_based_answer, ...rest } = ctx;\nreturn [{ json: { ...rest, answer, calls } }];\n"
+      },
+      "id": "ba3aff0d-bbd9-5fa5-83f3-6698c5d6301c",
+      "name": "Package Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Planner Context \u2014 selects only what the Planner needs (context minimisation = lower cost, less room to drift).\nconst ctx = $input.first().json;\nconst { facts, project, router } = ctx;\nconst SYSTEM = \"ROLE: You are Mira's Planner Agent, a senior TPM who turns a project description and phase timeline into a structured, decision-ready project plan.\\n\\nINPUT: A SOURCE DATA block containing (a) the project description, (b) the phase timeline with dates already computed by code, and (c) a compact task list from the Kanban board. Treat SOURCE DATA as the only truth.\\n\\nOUTPUT: Markdown with EXACTLY these sections, in this order:\\n## 1. Project Summary\\n2-3 sentences using only facts from the description.\\n## 2. Goals & Success Metrics\\nOnly goals stated in the description. If a goal has no numeric target, write \\\"target not specified in source\\\".\\n## 3. Phase Plan\\nTable: Phase | Weeks | Dates | Key Activities | Milestones / Deliverables | Linked Tasks (IDs from the task list)\\nUse the phases, weeks, dates and milestones exactly as given. A task may be linked only if its name clearly matches the phase activities.\\n## 4. Key Milestones\\nBulleted list: milestone - due date (phase end date from SOURCE DATA).\\n## 5. Team & Governance\\nOnly what the data says (the cross-functional task force; task-board assignees and their task areas).\\n## 6. Dependencies & Assumptions\\nEach line must be tagged [FROM DATA] or [ASSUMPTION].\\n## 7. Open Questions for the Sponsor\\nThings a real plan needs that the source does not specify (e.g. budget, tooling decisions, approval gates).\\n\\nRULES:\\n1. Do NOT invent goals, KPIs, phases, milestones, dates, people, budgets or technologies.\\n2. Every milestone must appear in the timeline. Every date must be copied from SOURCE DATA - never calculate new dates.\\n3. Any inference must be tagged [ASSUMPTION].\\n4. If something is not in the data, write \\\"Not specified in source data\\\".\\n5. If the task board and the timeline disagree (e.g. a task due outside its phase window), note it under Dependencies & Assumptions rather than silently fixing it.\\n\\nVAGUE INPUT RULE: If SOURCE DATA lacks a goal/scope, a timeline, or a team, do not produce a plan. Reply only: \\\"INSUFFICIENT DETAIL - cannot generate a plan without: <missing items>\\\".\\n\";\nlet source;\nif (router.project_ref === 'abcde') {\n  source = {\n    project: project.name,\n    description: project.description,\n    timeline_with_dates: facts.phases.map(({ phase, name, weeks, start_date, end_date, key_activities, milestones }) => ({ phase, name, weeks, start_date, end_date, key_activities, milestones })),\n    task_list: Object.values(facts.by_sprint).flatMap(s => s.tasks).map(t => ({ id: t.id, name: t.name, status: t.status, assignee: t.assignee, sprint: t.sprint, due: t.due })),\n    data_notes: facts.data_notes,\n  };\n} else {\n  source = { project: 'User-described project', description: router.user_supplied_details, timeline_with_dates: 'Not provided', task_list: 'Not provided' };\n}\nconst request = {\n  model: ctx.config.specialist_model, temperature: 0.2,\n  messages: [\n    { role: 'system', content: SYSTEM },\n    { role: 'user', content: `USER REQUEST: ${ctx.message}\\n\\nSOURCE DATA:\\n${JSON.stringify(source, null, 1)}` },\n  ],\n};\nreturn [{ json: { ...ctx, agent_name: 'Planner Agent', request, agent_started_ms: Date.now() } }];\n"
+      },
+      "id": "cb9ec1e7-2ca5-5505-a655-c3a50e750b2e",
+      "name": "Planner Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config + Input').first().json.config.openai_base_url }}/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "eed8893b-a08a-58f5-aef7-93c9a310dab7",
+      "name": "Planner Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Risk Context \u2014 risk register + live delivery signals from the task board.\nconst ctx = $input.first().json;\nconst { facts, project, router } = ctx;\nconst SYSTEM = \"ROLE: You are Mira's Risk Assessor Agent. You produce project-specific risk assessments grounded in the project's risk register and live delivery signals.\\n\\nINPUT: A SOURCE DATA block with (a) the risk register R01-R10 (category, risk, impact, mitigation), (b) the project description, (c) delivery signals computed by code from the task board (blocked, overdue and at-risk tasks, compliance/security tasks, current phase), and (d) the user's request.\\n\\nOUTPUT:\\n- If the user asks a specific question (e.g. \\\"top 3 risks\\\"), answer it FIRST, in a numbered list. For each risk give: Risk ID, category, the risk, why it ranks here (cite the delivery signal or description fact), mitigation from the register.\\n- If the user asks for a risk assessment, return Markdown with:\\n  ## Risk Matrix\\n  Table: ID | Category | Risk | Impact | Likelihood (H/M/L) | Severity (H/M/L) | Evidence in Project Data | Mitigation (register) | Next Action [SUGGESTED]\\n  Include all register risks, grouped or ordered by severity.\\n  ## Live Signals Driving the Ratings\\n  Bullet each delivery signal (task ID + status + due date) and the risk ID it affects.\\n  ## Rating Method\\n  One short paragraph: the register has no likelihood/severity scores, so ratings are Mira's judgement from the evidence listed.\\n\\nRULES:\\n1. Use ONLY risks R01-R10 from the register. Do not add generic risks (e.g. \\\"team member illness\\\", \\\"scope creep\\\") unless a task-board signal directly evidences them; if so, tag the row [NEW - evidenced by T0xx].\\n2. Copy impact and mitigation text from the register; anything you add goes in \\\"Next Action [SUGGESTED]\\\".\\n3. Cite only task IDs and risk IDs that exist in SOURCE DATA.\\n4. No probabilities, money amounts or dates that are not in SOURCE DATA.\\n5. Where there is no evidence for a risk, say \\\"No current signal\\\" - do not manufacture one.\\n\\nVAGUE INPUT RULE: If no risk register and no project description are provided, reply only: \\\"INSUFFICIENT DETAIL - cannot assess risks without: <missing items>\\\".\\n\";\nlet source;\nif (router.project_ref === 'abcde') {\n  const allTasks = Object.values(facts.by_sprint).flatMap(s => s.tasks);\n  const pick = ids => allTasks.filter(t => ids.includes(t.id));\n  const governanceIds = project.tasks.filter(t => /security|compliance/i.test(t.labels)).map(t => t.task_id);\n  source = {\n    project: project.name,\n    description: project.description,\n    risk_register: project.risks,\n    delivery_signals: {\n      report_date: facts.report_date,\n      current_phase: facts.current_phase && `${facts.current_phase.phase}. ${facts.current_phase.name} (${facts.current_phase.start_date} to ${facts.current_phase.end_date})`,\n      blocked: facts.blocked, overdue: facts.overdue, at_risk: facts.at_risk,\n      security_and_compliance_tasks: pick(governanceIds),\n      vendor_and_platform_tasks: allTasks.filter(t => /vendor|platform/i.test(t.name)),\n      people_and_adoption_tasks: allTasks.filter(t => /training|pilot|feedback|stakeholder/i.test(t.name)),\n      data_tasks: allTasks.filter(t => /data/i.test(t.name)),\n      status_counts: facts.status_counts,\n      data_notes: facts.data_notes,\n    },\n  };\n} else {\n  source = { project: 'User-described project', description: router.user_supplied_details, risk_register: 'Not provided', delivery_signals: 'Not provided' };\n}\nconst request = {\n  model: ctx.config.specialist_model, temperature: 0.2,\n  messages: [\n    { role: 'system', content: SYSTEM },\n    { role: 'user', content: `USER REQUEST: ${ctx.message}\\n\\nSOURCE DATA:\\n${JSON.stringify(source, null, 1)}` },\n  ],\n};\nreturn [{ json: { ...ctx, agent_name: 'Risk Assessor Agent', request, agent_started_ms: Date.now() } }];\n"
+      },
+      "id": "70ec88f3-4a07-550d-beb1-cc917b9b8e6e",
+      "name": "Risk Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config + Input').first().json.config.openai_base_url }}/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "4214b649-9121-59b4-8d47-3dd8bcec91b7",
+      "name": "Risk Assessor Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        190
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Status Context \u2014 pre-computed counts and task lists for the requested scope (a sprint, or the whole project).\nconst ctx = $input.first().json;\nconst { facts, router } = ctx;\nconst SYSTEM = \"ROLE: You are Mira's Status Reporter Agent. You turn pre-computed task-board facts into a clear weekly status report.\\n\\nINPUT: A FACTS JSON block computed by code from the task board (status counts, the tasks in scope, overdue / blocked / at-risk tasks, upcoming milestones, a rule-based health rating with reasons, and the report date), plus the user's request.\\n\\nOUTPUT:\\n- If the user asks a direct question (e.g. \\\"how many tasks are done?\\\"), answer it in the first 1-3 lines using the exact counts, then give a compact summary table.\\n- If the user asks for a report, return Markdown:\\n  # Weekly Status Report - <scope> - week ending <report date>\\n  **Overall health:** <rating from FACTS> - <reasons from FACTS>\\n  ## Summary\\n  Table of counts (copied exactly from FACTS) for the scope, and for the whole project if provided.\\n  ## Completed\\n  ## In Progress\\n  ## Blocked\\n  ## To Do (in scope)\\n  Each list: Task ID - task name - assignee - due date.\\n  ## Overdue / Carry-over\\n  ## Upcoming Milestones (next 14 days)\\n  ## Asks & Escalations\\n  Only items derived from blocked or overdue tasks.\\n\\nRULES:\\n1. Every number must be copied from FACTS. Never compute or estimate percentages, velocity or effort that FACTS does not contain.\\n2. Never mention a task, person, date or milestone that is not in FACTS.\\n3. If a section has no items, write \\\"None\\\".\\n4. Do not change any task's status, even if it looks late.\\n\\nVAGUE INPUT RULE: If FACTS contains no tasks, reply only: \\\"NO TASK DATA - cannot report status. Please share a task board export (task, status, assignee, due date, sprint).\\\"\\n\";\nconst allTasks = Object.values(facts.by_sprint).flatMap(s => s.tasks);\nconst byStatus = list => Object.fromEntries(['Done', 'In Progress', 'Blocked', 'To Do'].map(s => [s, list.filter(t => t.status === s)]));\nconst sprintKey = router.sprint ? `Sprint ${router.sprint}` : null;\nlet scopeFacts;\nif (sprintKey && facts.by_sprint[sprintKey]) {\n  const sp = facts.by_sprint[sprintKey];\n  scopeFacts = {\n    scope: sprintKey,\n    scope_counts: sp.counts,\n    scope_tasks_by_status: byStatus(sp.tasks),\n    carry_over_from_earlier_sprints: facts.overdue.filter(t => Number(t.sprint.replace(/\\D/g, '')) < router.sprint),\n    project_counts: facts.status_counts,\n  };\n} else if (sprintKey) {\n  scopeFacts = { scope: sprintKey, scope_counts: { Total: 0 }, scope_tasks_by_status: {}, note: `${sprintKey} does not exist on the task board` };\n} else {\n  scopeFacts = {\n    scope: 'Whole project',\n    scope_counts: facts.status_counts,\n    percent_done: facts.percent_done,\n    scope_tasks_by_status: byStatus(allTasks),\n    current_sprint: facts.current_sprint,\n  };\n}\nconst FACTS = {\n  report_date: facts.report_date,\n  project: ctx.project.name,\n  ...scopeFacts,\n  overdue: facts.overdue, blocked: facts.blocked, at_risk: facts.at_risk,\n  upcoming_milestones_next_14_days: facts.upcoming_milestones,\n  health: facts.health, health_reasons: facts.health_reasons,\n};\nconst request = {\n  model: ctx.config.specialist_model, temperature: 0,\n  messages: [\n    { role: 'system', content: SYSTEM },\n    { role: 'user', content: `USER REQUEST: ${ctx.message}\\n\\nFACTS:\\n${JSON.stringify(FACTS, null, 1)}` },\n  ],\n};\nreturn [{ json: { ...ctx, agent_name: 'Status Reporter Agent', scope_task_ids: sprintKey ? (facts.by_sprint[sprintKey]?.tasks || []).map(t => t.id) : allTasks.map(t => t.id), request, agent_started_ms: Date.now() } }];\n"
+      },
+      "id": "36a9a9ec-a54d-596c-82d0-3fa671755a40",
+      "name": "Status Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config + Input').first().json.config.openai_base_url }}/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "05fbc405-3cc0-5164-8492-668bb57e0e0a",
+      "name": "Status Reporter Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Milestone Context \u2014 dated timeline + delivery alerts for the Milestone Tracker (extended capability).\nconst ctx = $input.first().json;\nconst { facts } = ctx;\nconst SYSTEM = \"ROLE: You are Mira's Milestone Tracker Agent (Milestone Alert System). You flag what is blocked, overdue or at risk, and which milestones are coming up.\\n\\nINPUT: A FACTS JSON block computed by code: report date, current phase, phase schedule with dates, upcoming milestones within the alert window, blocked tasks, overdue tasks, at-risk tasks (with the rule that flagged each), plus the user's question.\\n\\nOUTPUT (Markdown):\\n1. A direct answer to the user's question in 1-3 lines.\\n2. ## Alerts\\n   Table: Item | Type (Blocked / Overdue / At Risk / Upcoming Milestone) | Due | Owner | Why (from FACTS) | Suggested Action [SUGGESTED]\\n3. ## Milestone Outlook\\n   Current phase, milestones in the window with due dates, and the next milestone after the window.\\n4. ## Method\\n   One line stating the report date and the at-risk rules used (copied from FACTS).\\n\\nRULES:\\n1. Only milestones from the timeline and only dates from FACTS. Never calculate new dates.\\n2. Only tasks listed in FACTS. Never upgrade or downgrade a task's status.\\n3. \\\"Why\\\" must quote the FACTS reason (e.g. \\\"Blocked: waiting for security team availability\\\", \\\"due in 4 days, still In Progress\\\").\\n4. If the window contains no milestones, say so and name the next one from FACTS.\\n\\nVAGUE INPUT RULE: If FACTS contains no timeline and no tasks, reply only: \\\"NO PROJECT DATA - cannot track milestones.\\\"\\n\";\nconst FACTS = {\n  report_date: facts.report_date,\n  project: ctx.project.name,\n  current_phase: facts.current_phase,\n  phase_schedule: facts.phases.map(({ phase, name, weeks, start_date, end_date, schedule_status }) => ({ phase, name, weeks, start_date, end_date, schedule_status })),\n  alert_window_days: ctx.config.milestone_window_days,\n  upcoming_milestones_in_window: facts.upcoming_milestones,\n  next_milestones_after_window: facts.next_after_window,\n  blocked: facts.blocked, overdue: facts.overdue, at_risk: facts.at_risk,\n  at_risk_rules: facts.at_risk_rules,\n  data_notes: facts.data_notes,\n};\nconst request = {\n  model: ctx.config.specialist_model, temperature: 0,\n  messages: [\n    { role: 'system', content: SYSTEM },\n    { role: 'user', content: `USER REQUEST: ${ctx.message}\\n\\nFACTS:\\n${JSON.stringify(FACTS, null, 1)}` },\n  ],\n};\nreturn [{ json: { ...ctx, agent_name: 'Milestone Tracker Agent', request, agent_started_ms: Date.now() } }];\n"
+      },
+      "id": "9616b467-df0c-5dfd-9245-43bf2e9c4b77",
+      "name": "Milestone Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        570
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config + Input').first().json.config.openai_base_url }}/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "7d5a28b6-db97-5c46-8cf1-0800eda00efb",
+      "name": "Milestone Tracker Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        570
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stakeholder Context \u2014 ONLY the requested sprint's tasks are passed, so other sprints cannot leak into the email.\nconst ctx = $input.first().json;\nconst { facts, router } = ctx;\nconst SYSTEM = \"ROLE: You are Mira's Stakeholder Update Agent. You write a concise, professional stakeholder email about one sprint.\\n\\nINPUT: A FACTS JSON block computed by code containing ONLY the requested sprint's tasks (with status, owner, due date), the sprint's counts, the target audience, and the report date.\\n\\nOUTPUT: A plain-text email:\\nSubject: <project> - <Sprint N> progress update\\nHi all,\\n<2-sentence summary with the counts from FACTS>\\nCompleted: <bullets: task - owner>\\nIn progress: <bullets: task - owner - due date; mark \\\"past due\\\" only if FACTS says overdue>\\nBlocked / risks: <only from in-scope tasks; otherwise \\\"None in this sprint\\\">\\nNext steps: <only the in-scope tasks that are not Done>\\nRegards,\\nMira (Project Intelligence Assistant) on behalf of the PMO\\n\\nAudience tone: leadership = outcome-focused, no jargon; engineering = task-level detail; client = outcomes and dates only.\\n\\nRULES:\\n1. Mention ONLY tasks in FACTS (the requested sprint). Never mention tasks, plans or sprints beyond it.\\n2. Copy counts, names, owners and dates exactly. No percentages unless FACTS contains them.\\n3. Do not invent achievements, metrics, decisions or recipients' names.\\n\\nVAGUE INPUT RULE: If FACTS has no tasks for the sprint, reply only: \\\"NO TASK DATA FOR THIS SPRINT - cannot write the update.\\\"\\n\";\nconst sprintKey = router.sprint ? `Sprint ${router.sprint}` : facts.current_sprint;\nconst sp = facts.by_sprint[sprintKey] || { counts: { Total: 0 }, tasks: [] };\nconst FACTS = {\n  project: ctx.project.name,\n  report_date: facts.report_date,\n  sprint: sprintKey,\n  audience: router.audience || 'leadership',\n  sprint_counts: sp.counts,\n  sprint_tasks: sp.tasks.map(t => ({ ...t, overdue: t.status !== 'Done' && t.days_to_due < 0 })),\n};\nconst request = {\n  model: ctx.config.specialist_model, temperature: 0.3,\n  messages: [\n    { role: 'system', content: SYSTEM },\n    { role: 'user', content: `USER REQUEST: ${ctx.message}\\n\\nFACTS:\\n${JSON.stringify(FACTS, null, 1)}` },\n  ],\n};\nreturn [{ json: { ...ctx, agent_name: 'Stakeholder Update Agent', scope_task_ids: sp.tasks.map(t => t.id), request, agent_started_ms: Date.now() } }];\n"
+      },
+      "id": "e72fc182-1811-52f9-ae7b-49cf4eef9de3",
+      "name": "Stakeholder Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config + Input').first().json.config.openai_base_url }}/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "8e65c802-101d-5de4-a280-9a32aeacba5f",
+      "name": "Stakeholder Update Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        760
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clarifier (rule-based, no LLM) \u2014 when data is insufficient Mira asks, it never guesses.\n// Deterministic by design: zero hallucination risk and zero token cost on vague inputs.\nconst ctx = $input.first().json;\nconst { router } = ctx;\nconst NEEDS = {\n  plan: ['Project goal and scope (what is being built and why)', 'Key deliverables', 'Timeline: start date, duration or deadline', 'Team size and roles', 'Constraints: budget, technology, dependencies', 'Success criteria / KPIs'],\n  risk: ['What the project is: domain, scope and goals', 'Timeline and current phase', 'Team, vendors and technologies involved', 'Known constraints (budget, compliance, integrations)', 'Any existing risk register or known issues'],\n  status: ['Task board export (CSV, Trello or Jira) with task name, status, assignee, due date and sprint', 'Reporting period (which week or sprint)'],\n  milestone: ['Project timeline with milestones and dates', 'Task board export with statuses and due dates'],\n  stakeholder_update: ['Task board export for the sprint (task, status, owner, due date)', 'Audience (leadership, engineering or client)'],\n};\nconst LABEL = { plan: 'a project plan', risk: 'a risk assessment', status: 'a status report', milestone: 'a milestone report', stakeholder_update: 'a stakeholder update' };\nlet answer;\nif (router.intent === 'unsupported' || !ctx.message) {\n  answer = [\n    \"I'm Mira, a project intelligence assistant. I can help with:\",\n    '- Project plans (phases, milestones, timeline)',\n    '- Risk assessments and top risks',\n    '- Weekly status reports and task counts',\n    '- Blocked / at-risk tasks and upcoming milestones',\n    '- Stakeholder update emails for a sprint',\n    '',\n    'Data currently loaded: the ABCDE Ltd. AI Adoption Project (description, timeline, risk register, task board).',\n  ].join('\\n');\n} else {\n  const isNoData = ['status', 'milestone', 'stakeholder_update'].includes(router.intent);\n  const given = router.user_supplied_details ? `\"${router.user_supplied_details}\"` : 'no project details';\n  answer = [\n    isNoData\n      ? `NO TASK DATA AVAILABLE - I can't produce ${LABEL[router.intent]} from ${given}. Reporting progress without task data would mean inventing task statuses and percentages.`\n      : `INSUFFICIENT DETAIL - I can't generate ${LABEL[router.intent]} from ${given} without inventing scope, dates and people.`,\n    '',\n    'Please share:',\n    ...NEEDS[router.intent].map(n => `- ${n}`),\n    ...(router.guardrails.some(g => g.startsWith('Sprint')) ? ['', `Note: ${router.guardrails.join('; ')}.`] : []),\n    '',\n    'Or ask about the ABCDE Ltd. AI Adoption Project, which is already loaded.',\n  ].join('\\n');\n}\nreturn [{ json: { ...ctx, agent_name: 'Clarifier (rule-based)', rule_based_answer: answer, agent_started_ms: Date.now() } }];\n"
+      },
+      "id": "ca1434b4-6e9a-5892-a21a-acf95cdd8486",
+      "name": "Clarifier (rule-based)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        950
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Grounding Check \u2014 automatic post-generation evaluator. Every task ID, risk ID and date in the answer must exist\n// in the source data; stakeholder emails may only mention in-scope sprint tasks. Flags are returned with the answer\n// and sent to Langfuse, so hallucinations show up in traces and metrics.\nconst ctx = $input.first().json;\nconst { facts, router, config: cfg } = ctx;\nconst answer = ctx.answer || '';\nconst uniq = a => [...new Set(a)];\nconst flags = [];\n\nconst taskIds = uniq(answer.match(/\\bT0\\d{2}\\b/g) || []);\nconst riskIds = uniq(answer.match(/\\bR\\d{2}\\b/g) || []);\nconst dates = uniq(answer.match(/\\b20\\d{2}-\\d{2}-\\d{2}\\b/g) || []);\n\ntaskIds.filter(id => !facts.all_task_ids.includes(id)).forEach(id => flags.push(`Unknown task ID ${id}`));\nriskIds.filter(id => !facts.all_risk_ids.includes(id)).forEach(id => flags.push(`Unknown risk ID ${id}`));\n\nconst knownDates = new Set([\n  facts.report_date, facts.project_start, facts.project_end,\n  ...Object.values(facts.by_sprint).flatMap(s => s.tasks.map(t => t.due)),\n  ...facts.phases.flatMap(p => [p.start_date, p.end_date]),\n]);\nif (router.project_ref === 'abcde') dates.filter(d => !knownDates.has(d)).forEach(d => flags.push(`Date ${d} not found in source data`));\n\nif (router.route === 'stakeholder_update' && ctx.scope_task_ids) {\n  taskIds.filter(id => !ctx.scope_task_ids.includes(id)).forEach(id => flags.push(`Out-of-scope task ${id} mentioned in sprint update`));\n}\nif (router.route === 'status' && router.sprint && ctx.scope_task_ids) {\n  const allowed = new Set([...ctx.scope_task_ids, ...facts.overdue.map(t => t.id), ...facts.blocked.map(t => t.id), ...facts.at_risk.map(t => t.id)]);\n  taskIds.filter(id => !allowed.has(id)).forEach(id => flags.push(`Task ${id} is outside the requested scope`));\n}\nconst notes = [];\nif (router.route !== 'clarify' && router.project_ref !== 'abcde') notes.push('Answer is based only on user-supplied details (no project files loaded) - review before sharing');\n\n// Cost per call (USD) from the price table in Config\nconst price = m => cfg.prices[Object.keys(cfg.prices).find(k => (m || '').startsWith(k))] || { input: 0, output: 0 };\nconst agents = ctx.calls.map(c => ({\n  agent: c.agent, model: c.model, input_tokens: c.input_tokens, output_tokens: c.output_tokens, latency_ms: c.latency_ms,\n  cost_usd: Number(((c.input_tokens * price(c.model).input + c.output_tokens * price(c.model).output) / 1e6).toFixed(6)),\n}));\nconst totals = agents.reduce((a, c) => ({\n  input_tokens: a.input_tokens + c.input_tokens, output_tokens: a.output_tokens + c.output_tokens,\n  cost_usd: Number((a.cost_usd + c.cost_usd).toFixed(6)),\n}), { input_tokens: 0, output_tokens: 0, cost_usd: 0 });\ntotals.latency_ms = Date.now() - ctx.started_ms;\n\nconst grounding = { passed: flags.length === 0, flags, notes, task_ids_cited: taskIds, risk_ids_cited: riskIds };\nconst response = {\n  test_id: ctx.test_id, request: ctx.message, as_of_date: facts.report_date,\n  route: router.route, intent: router.intent, project_ref: router.project_ref, sprint: router.sprint,\n  router_reason: router.reason, guardrails: router.guardrails,\n  answer, grounding, agents, totals, trace_id: ctx.trace_id,\n};\n\n// Langfuse ingestion batch: 1 trace + 1 generation per LLM call + spans for the deterministic steps\nconst now = new Date().toISOString();\nconst ev = (type, body, i) => ({ id: `${ctx.trace_id}-${i}`, timestamp: now, type, body });\nconst batch = [\n  ev('trace-create', {\n    id: ctx.trace_id, name: 'mira-request', input: ctx.message, output: answer, sessionId: ctx.session_id || undefined,\n    tags: ['mira', `route:${router.route}`, grounding.passed ? 'grounded' : 'grounding-flags'],\n    metadata: { test_id: ctx.test_id, router, grounding, totals, as_of_date: facts.report_date },\n  }, 0),\n  ev('span-create', { id: `${ctx.trace_id}-facts`, traceId: ctx.trace_id, name: 'Compute Facts (code)', startTime: ctx.started_at, endTime: new Date(Date.parse(ctx.started_at) + (ctx.facts_ms || 0)).toISOString(), output: { status_counts: facts.status_counts, health: facts.health } }, 1),\n  ...ctx.calls.map((c, i) => c.model.startsWith('none')\n    ? ev('span-create', { id: `${ctx.trace_id}-call${i}`, traceId: ctx.trace_id, name: c.agent, startTime: c.start_time, endTime: c.end_time, input: c.input, output: c.output }, 2 + i)\n    : ev('generation-create', {\n      id: `${ctx.trace_id}-call${i}`, traceId: ctx.trace_id, name: c.agent, model: c.model, startTime: c.start_time, endTime: c.end_time,\n      input: c.input, output: c.output,\n      usage: { input: c.input_tokens, output: c.output_tokens, total: c.input_tokens + c.output_tokens, unit: 'TOKENS' },\n      usageDetails: { input: c.input_tokens, output: c.output_tokens },\n      costDetails: { total: agents[i].cost_usd },\n      metadata: { cost_usd: agents[i].cost_usd },\n    }, 2 + i)),\n  ev('span-create', { id: `${ctx.trace_id}-ground`, traceId: ctx.trace_id, name: 'Grounding Check (code)', startTime: now, endTime: new Date().toISOString(), output: grounding, level: grounding.passed ? 'DEFAULT' : 'WARNING' }, 9),\n  ev('score-create', { id: `${ctx.trace_id}-score`, traceId: ctx.trace_id, name: 'grounded', value: grounding.passed ? 1 : 0, comment: flags.join('; ') || 'all cited IDs and dates found in source data' }, 10),\n];\n\nreturn [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/ingestion`, langfuse_body: { batch } } }];\n"
+      },
+      "id": "0056e797-005c-5128-9d7c-8928f198cb40",
+      "name": "Grounding Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2680,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "lf-enabled",
+              "leftValue": "={{ $json.langfuse_enabled }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d0ad9f05-73aa-5404-9606-ece321c269a0",
+      "name": "Langfuse Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2900,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.langfuse_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.langfuse_body) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "80b94e3d-d0ba-549c-b8a5-6a48e1c87f90",
+      "name": "Log to Langfuse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        350
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Grounding Check').first().json.response) }}",
+        "options": {}
+      },
+      "id": "bbea849f-3035-5f88-a4d4-e69c9bb53c6d",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3200,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Planner Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Risk Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Status Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Milestone Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stakeholder Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clarifier (rule-based)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planner Context": {
+      "main": [
+        [
+          {
+            "node": "Planner Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planner Agent": {
+      "main": [
+        [
+          {
+            "node": "Package Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Context": {
+      "main": [
+        [
+          {
+            "node": "Risk Assessor Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Assessor Agent": {
+      "main": [
+        [
+          {
+            "node": "Package Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Context": {
+      "main": [
+        [
+          {
+            "node": "Status Reporter Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Reporter Agent": {
+      "main": [
+        [
+          {
+            "node": "Package Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Milestone Context": {
+      "main": [
+        [
+          {
+            "node": "Milestone Tracker Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Milestone Tracker Agent": {
+      "main": [
+        [
+          {
+            "node": "Package Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stakeholder Context": {
+      "main": [
+        [
+          {
+            "node": "Stakeholder Update Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stakeholder Update Agent": {
+      "main": [
+        [
+          {
+            "node": "Package Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clarifier (rule-based)": {
+      "main": [
+        [
+          {
+            "node": "Package Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config + Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config + Input": {
+      "main": [
+        [
+          {
+            "node": "Load Project Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Project Data": {
+      "main": [
+        [
+          {
+            "node": "Compute Facts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Facts": {
+      "main": [
+        [
+          {
+            "node": "Build Router Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Router Request": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Route": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Package Response": {
+      "main": [
+        [
+          {
+            "node": "Grounding Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grounding Check": {
+      "main": [
+        [
+          {
+            "node": "Langfuse Enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Langfuse": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Langfuse Enabled?": {
+      "main": [
+        [
+          {
+            "node": "Log to Langfuse",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1000" viewBox="0 0 1400 1000" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475467"/>
+    </marker>
+    <marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#98a2b3"/>
+    </marker>
+    <style>
+      .t{font-size:17px;font-weight:700;fill:#101828}
+      .s{font-size:13px;fill:#475467}
+      .x{font-size:12px;fill:#667085}
+      .h{font-size:14px;font-weight:700;letter-spacing:.06em;fill:#344054}
+      .ln{stroke:#475467;stroke-width:1.8;fill:none}
+      .dl{stroke:#98a2b3;stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+    </style>
+  </defs>
+  <rect width="1400" height="1000" fill="#ffffff"/>
+  <text x="40" y="48" font-size="26" font-weight="800" fill="#101828">Mira - AI Project Intelligence Assistant</text>
+  <text x="40" y="74" class="s">Router (dispatcher) multi-agent pattern on n8n · deterministic data layer · code guardrails · grounding evaluator · Langfuse tracing</text>
+
+  <!-- Trigger -->
+  <rect x="40" y="105" width="300" height="74" rx="10" fill="#f2f4f7" stroke="#d0d5dd"/>
+  <text x="58" y="135" class="t">PM / TPM request</text>
+  <text x="58" y="158" class="s">Webhook POST /mira (or Slack / chat)</text>
+
+  <!-- Data layer -->
+  <rect x="40" y="215" width="1320" height="150" rx="12" fill="#f0f9ff" stroke="#b9e6fe"/>
+  <text x="58" y="240" class="h">1 · DETERMINISTIC DATA LAYER (CODE, NO LLM)</text>
+  <rect x="58" y="255" width="260" height="96" rx="8" fill="#fff" stroke="#7cd4fd"/>
+  <text x="74" y="281" class="t">Config + Input</text>
+  <text x="74" y="303" class="s">as-of date 2026-04-24, models,</text>
+  <text x="74" y="321" class="s">price table, alert windows</text>
+  <rect x="340" y="255" width="330" height="96" rx="8" fill="#fff" stroke="#7cd4fd"/>
+  <text x="356" y="281" class="t">Load Project Data</text>
+  <text x="356" y="303" class="s">project_description.txt · project_timeline.csv</text>
+  <text x="356" y="321" class="s">project_risks.csv · sample_task_board.csv</text>
+  <text x="356" y="339" class="x">(swap for Drive / Trello / Jira nodes)</text>
+  <rect x="692" y="255" width="650" height="96" rx="8" fill="#fff" stroke="#7cd4fd"/>
+  <text x="708" y="281" class="t">Compute Facts</text>
+  <text x="708" y="303" class="s">status counts (total + per sprint) · overdue / blocked / at-risk rules · dated phases</text>
+  <text x="708" y="321" class="s">and milestones · upcoming-milestone window · rule-based health · data-quality notes</text>
+  <text x="708" y="339" class="x">→ LLMs never count, filter or do date maths</text>
+
+  <!-- Router -->
+  <rect x="300" y="400" width="800" height="100" rx="12" fill="#fffaeb" stroke="#fedf89"/>
+  <text x="318" y="425" class="h">2 · ORCHESTRATOR (ROUTER)</text>
+  <text x="318" y="452" class="t">Orchestrator Agent  ·  gpt-4o-mini, temp 0, JSON mode</text>
+  <text x="318" y="474" class="s">classifies intent (plan / risk / status / milestone / stakeholder_update) + project ref + sufficiency</text>
+  <text x="318" y="492" class="s">Parse Route (code): guardrails override the model - non-loaded project without data → Clarifier</text>
+
+  <!-- Specialists -->
+  <rect x="40" y="535" width="1320" height="180" rx="12" fill="#f4f3ff" stroke="#d9d6fe"/>
+  <text x="58" y="560" class="h">3 · SPECIALIST AGENTS (each receives only the data it needs)</text>
+  <g>
+    <rect x="58" y="575" width="205" height="124" rx="8" fill="#fff" stroke="#bdb4fe"/>
+    <text x="72" y="600" class="t">Planner</text>
+    <text x="72" y="622" class="s">description + dated</text>
+    <text x="72" y="640" class="s">timeline + task list</text>
+    <text x="72" y="662" class="x">7-section plan, tags</text>
+    <text x="72" y="678" class="x">[ASSUMPTION]</text>
+  </g>
+  <g>
+    <rect x="277" y="575" width="205" height="124" rx="8" fill="#fff" stroke="#bdb4fe"/>
+    <text x="291" y="600" class="t">Risk Assessor</text>
+    <text x="291" y="622" class="s">register R01-R10 +</text>
+    <text x="291" y="640" class="s">live delivery signals</text>
+    <text x="291" y="662" class="x">evidence-based matrix,</text>
+    <text x="291" y="678" class="x">no generic risks</text>
+  </g>
+  <g>
+    <rect x="496" y="575" width="205" height="124" rx="8" fill="#fff" stroke="#bdb4fe"/>
+    <text x="510" y="600" class="t">Status Reporter</text>
+    <text x="510" y="622" class="s">pre-computed counts</text>
+    <text x="510" y="640" class="s">for sprint / project</text>
+    <text x="510" y="662" class="x">weekly report, numbers</text>
+    <text x="510" y="678" class="x">copied, never computed</text>
+  </g>
+  <g>
+    <rect x="715" y="575" width="205" height="124" rx="8" fill="#fff" stroke="#bdb4fe"/>
+    <text x="729" y="600" class="t">Milestone Tracker</text>
+    <text x="729" y="622" class="s">blocked / overdue /</text>
+    <text x="729" y="640" class="s">at-risk + milestones</text>
+    <text x="729" y="662" class="x">EXTENDED: Milestone</text>
+    <text x="729" y="678" class="x">Alert System</text>
+  </g>
+  <g>
+    <rect x="934" y="575" width="205" height="124" rx="8" fill="#fff" stroke="#bdb4fe"/>
+    <text x="948" y="600" class="t">Stakeholder Update</text>
+    <text x="948" y="622" class="s">only the requested</text>
+    <text x="948" y="640" class="s">sprint's tasks</text>
+    <text x="948" y="662" class="x">EXTENDED: audience-</text>
+    <text x="948" y="678" class="x">tuned email</text>
+  </g>
+  <g>
+    <rect x="1153" y="575" width="190" height="124" rx="8" fill="#fef3f2" stroke="#fda29b"/>
+    <text x="1167" y="600" class="t">Clarifier</text>
+    <text x="1167" y="622" class="s">rule-based, no LLM</text>
+    <text x="1167" y="640" class="s">vague / no-data input</text>
+    <text x="1167" y="662" class="x">asks for what is missing,</text>
+    <text x="1167" y="678" class="x">0 tokens, 0 hallucination</text>
+  </g>
+
+  <!-- Eval -->
+  <rect x="40" y="750" width="860" height="110" rx="12" fill="#ecfdf3" stroke="#abefc6"/>
+  <text x="58" y="775" class="h">4 · EVALUATION</text>
+  <text x="58" y="802" class="t">Grounding Check (code evaluator)</text>
+  <text x="58" y="824" class="s">every task ID, risk ID and date in the answer must exist in source data · sprint-scope check for emails</text>
+  <text x="58" y="842" class="s">adds tokens, latency, cost per agent · builds Langfuse trace + generations + "grounded" score</text>
+
+  <!-- Output -->
+  <rect x="300" y="900" width="600" height="70" rx="10" fill="#f2f4f7" stroke="#d0d5dd"/>
+  <text x="318" y="930" class="t">Response (JSON)</text>
+  <text x="318" y="952" class="s">answer · route · grounding flags · tokens · cost · latency · trace id</text>
+
+  <!-- External services -->
+  <rect x="1150" y="400" width="210" height="100" rx="10" fill="#fff" stroke="#667085" stroke-dasharray="6 4"/>
+  <text x="1168" y="428" class="t">OpenAI API</text>
+  <text x="1168" y="450" class="s">gpt-4o-mini</text>
+  <text x="1168" y="468" class="x">HTTP Request nodes,</text>
+  <text x="1168" y="484" class="x">retry x3</text>
+  <rect x="950" y="770" width="410" height="90" rx="10" fill="#fff" stroke="#667085" stroke-dasharray="6 4"/>
+  <text x="968" y="800" class="t">Langfuse (observability)</text>
+  <text x="968" y="822" class="s">trace per request · generation per agent</text>
+  <text x="968" y="840" class="x">tokens, cost, latency, grounded score (0/1)</text>
+
+  <!-- arrows -->
+  <path class="ln" d="M190 179 V215" marker-end="url(#a)"/>
+  <path class="ln" d="M318 303 H340" marker-end="url(#a)"/>
+  <path class="ln" d="M670 303 H692" marker-end="url(#a)"/>
+  <path class="ln" d="M1017 351 V375 H700 V400" marker-end="url(#a)"/>
+  <path class="ln" d="M700 500 V535" marker-end="url(#a)"/>
+  <path class="ln" d="M160 715 V732 H470 V750" marker-end="url(#a)"/>
+  <path class="ln" d="M1248 715 V732 H470" />
+  <path class="ln" d="M470 860 V900" marker-end="url(#a)"/>
+  <path class="dl" d="M1100 450 H1150" marker-end="url(#ad)" marker-start="url(#ad)"/>
+  <path class="dl" d="M1255 500 V535" marker-end="url(#ad)"/>
+  <path class="dl" d="M900 815 H950" marker-end="url(#ad)"/>
+  <text x="1263" y="528" class="x">to 5 LLM agents</text>
+</svg>
