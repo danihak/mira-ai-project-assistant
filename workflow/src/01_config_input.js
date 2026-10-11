@@ -36,7 +36,11 @@ return [{
     session_id: body.session_id || item.sessionId || null,
     channel,
     // Optional experiment link: { run_name, dataset_item_id } - links this trace to a Langfuse dataset run
-    experiment: body.experiment && body.experiment.run_name && body.experiment.dataset_item_id ? { run_name: String(body.experiment.run_name).slice(0, 80), dataset_item_id: String(body.experiment.dataset_item_id).slice(0, 80) } : null,
+    experiment: body.experiment && body.experiment.run_name && body.experiment.dataset_item_id ? {
+      run_name: String(body.experiment.run_name).slice(0, 80), dataset_item_id: String(body.experiment.dataset_item_id).slice(0, 80),
+      dataset_id: String(body.experiment.dataset_id || '').slice(0, 80), description: String(body.experiment.description || '').slice(0, 300),
+      expected_output: body.experiment.expected_output ? String(body.experiment.expected_output).slice(0, 1000) : null,
+    } : null,
     trace_id: $execution.id ? `mira-${$execution.id}-${Date.now()}` : `mira-${Date.now()}`,
     started_at: new Date().toISOString(),
     started_ms: Date.now(),

@@ -71,10 +71,18 @@ const ns = iso => `${Date.parse(iso)}000000`;
 const str = v => (typeof v === 'string' ? v : JSON.stringify(v));
 const attr = (key, v) => (Array.isArray(v) && v.every(x => typeof x === 'string') ? { key, value: { arrayValue: { values: v.map(x => ({ stringValue: String(x) })) } } }
   : typeof v === 'number' ? { key, value: { intValue: Math.round(v) } } : { key, value: { stringValue: str(v) } });
+// Experiment attributes (Langfuse "experiments via OpenTelemetry"): run-level on every span, item-level on the root span
+const ex = ctx.experiment;
+const runAttrs = ex ? [attr('langfuse.experiment.id', ex.run_name), attr('langfuse.experiment.name', ex.run_name),
+  ...(ex.dataset_id ? [attr('langfuse.experiment.dataset.id', ex.dataset_id)] : []), attr('langfuse.experiment.metadata.workflow', ex.run_name),
+  attr('langfuse.environment', 'experiment')] : [];
+const itemAttrs = ex ? [attr('langfuse.experiment.item.id', ex.dataset_item_id), attr('langfuse.experiment.item.root_observation_id', rootId),
+  ...(ex.description ? [attr('langfuse.experiment.description', ex.description)] : []),
+  ...(ex.expected_output ? [attr('langfuse.experiment.item.expected_output', JSON.stringify(ex.expected_output))] : [])] : [];
 const span = (name, parent, start, end, type, attrs) => ({
   traceId, spanId: parent === null ? rootId : hex(16), ...(parent ? { parentSpanId: parent } : {}), name, kind: 1,
   startTimeUnixNano: ns(start), endTimeUnixNano: ns(end),
-  attributes: [attr('langfuse.observation.type', type), ...attrs], status: {},
+  attributes: [attr('langfuse.observation.type', type), ...runAttrs, ...(parent === null ? itemAttrs : []), ...attrs], status: {},
 });
 const endIso = new Date().toISOString();
 const tags = ['mira', `route:${router.route}`, `channel:${ctx.channel || 'webhook'}`, grounding.passed ? 'grounded' : 'grounding-flags', ...(ctx.test_id ? [`test:${ctx.test_id}`] : [])];
@@ -106,7 +114,7 @@ const spans = [
   ]),
 ];
 const otel = { resourceSpans: [{ resource: { attributes: [attr('service.name', 'mira-n8n')] }, scopeSpans: [{ scope: { name: 'mira' }, spans }] }] };
-const score = { traceId, name: 'grounded', value: grounding.passed ? 1 : 0, dataType: 'NUMERIC', comment: flags.join('; ') || 'all cited IDs and dates found in source data' };
+const score = { traceId, observationId: rootId, name: 'grounded', value: grounding.passed ? 1 : 0, dataType: 'NUMERIC', comment: flags.join('; ') || 'all cited IDs and dates found in source data' };
 response.langfuse_trace_id = traceId;
 // `output` is what the n8n chat window displays: the answer plus a one-line audit footer
 const footer = router.route === 'clarify'
@@ -114,7 +122,6 @@ const footer = router.route === 'clarify'
   : `_Mira · route: ${router.route} · grounding: ${grounding.passed ? 'passed ✓' : 'FLAGS: ' + flags.join('; ')} · ${totals.input_tokens + totals.output_tokens} tokens · $${totals.cost_usd.toFixed(4)} · as of ${facts.report_date}_`;
 response.output = `${answer}\n\n---\n${footer}`;
 
-const experiment = ctx.experiment ? { runName: ctx.experiment.run_name, datasetItemId: ctx.experiment.dataset_item_id, traceId, metadata: { route: router.route, grounded: grounding.passed, cost_usd: totals.cost_usd } } : null;
-if (experiment) response.experiment = { run_name: experiment.runName, dataset_item_id: experiment.datasetItemId };
+if (ex) response.experiment = { run_name: ex.run_name, dataset_item_id: ex.dataset_item_id };
 
-return [{ json: { response, experiment, langfuse_dataset_run_url: `${cfg.langfuse_host}/api/public/dataset-run-items`, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/otel/v1/traces`, langfuse_body: otel, langfuse_score_url: `${cfg.langfuse_host}/api/public/scores`, langfuse_score_body: score } }];
+return [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/otel/v1/traces`, langfuse_body: otel, langfuse_score_url: `${cfg.langfuse_host}/api/public/scores`, langfuse_score_body: score } }];
