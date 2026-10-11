@@ -36,20 +36,21 @@ Tested on n8n **2.42.6**. Uses only core nodes (Webhook, Code, HTTP Request, Swi
 1. **Import** — n8n → *Workflows* → *Import from file* → `workflow/mira_workflow.json`.
 2. **OpenAI credential** — open **Orchestrator Agent** → *Credential for OpenAI* → *Create new* → paste your API key. Then select the same credential on the 5 other agent nodes (Planner, Risk Assessor, Status Reporter, Milestone Tracker, Stakeholder Update).
 3. **Publish / activate** the workflow. Copy the **production** webhook URL from the *Webhook* node (`…/webhook/mira`).
-4. **Try it:**
+4. **Chat window:** open the **Chat with Mira** node and copy its **Chat URL** (`https://<your-n8n>/webhook/<id>/chat`). It's a hosted chat page; each reply ends with an audit line (route, grounding result, tokens, cost). You can also use the **Open chat** button in the editor.
+5. **Try it via API:**
    ```bash
    curl -X POST https://<your-n8n>/webhook/mira -H "Content-Type: application/json" \
         -d '{"message": "Which tasks are blocked or at risk of missing their deadline?"}'
    ```
    The response is JSON: `answer`, `route`, `grounding` (passed + flags), per-agent `tokens / cost / latency`, `trace_id`.
-5. **Langfuse (observability)**
+6. **Langfuse (observability)**
    - Create a project at [cloud.langfuse.com](https://cloud.langfuse.com) → *Settings* → *API keys*.
    - In n8n, create a credential of type *Basic Auth*: **User = public key** (`pk-lf-…`), **Password = secret key** (`sk-lf-…`).
    - In **Config + Input**, set `langfuse_enabled: true` (and `langfuse_host` to `https://us.cloud.langfuse.com` if your project is in the US region).
    - Mira sends traces as **OpenTelemetry** spans to `/api/public/otel/v1/traces` (with header `x-langfuse-ingestion-version: 4`, so they appear immediately) and the `grounded` score to `/api/public/scores`. The legacy `/api/public/ingestion` API is not used; Langfuse Cloud retires it on 16 Nov 2026.
    - Attach the same Langfuse credential to **Log to Langfuse** and **Log Score to Langfuse**.
    - Each request now shows as a trace `mira-request` with spans *Compute Facts (code)*, *Orchestrator*, the specialist agent, *Grounding Check (code)* and a `grounded` score.
-6. **Run the baseline test dataset** (Python 3, standard library only):
+7. **Run the baseline test dataset** (Python 3, standard library only):
    ```bash
    python3 tests/run_tests.py --url https://<your-n8n>/webhook/mira
    # or score saved responses: python3 tests/run_tests.py --from-json tests/results/run2_results.json

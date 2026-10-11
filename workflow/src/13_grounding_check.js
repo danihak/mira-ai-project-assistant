@@ -104,5 +104,10 @@ const spans = [
 const otel = { resourceSpans: [{ resource: { attributes: [attr('service.name', 'mira-n8n')] }, scopeSpans: [{ scope: { name: 'mira' }, spans }] }] };
 const score = { traceId, name: 'grounded', value: grounding.passed ? 1 : 0, dataType: 'NUMERIC', comment: flags.join('; ') || 'all cited IDs and dates found in source data' };
 response.langfuse_trace_id = traceId;
+// `output` is what the n8n chat window displays: the answer plus a one-line audit footer
+const footer = router.route === 'clarify'
+  ? `_Mira · route: clarify (rule-based, no LLM) · cost $${totals.cost_usd.toFixed(4)}_`
+  : `_Mira · route: ${router.route} · grounding: ${grounding.passed ? 'passed ✓' : 'FLAGS: ' + flags.join('; ')} · ${totals.input_tokens + totals.output_tokens} tokens · $${totals.cost_usd.toFixed(4)} · as of ${facts.report_date}_`;
+response.output = `${answer}\n\n---\n${footer}`;
 
 return [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/otel/v1/traces`, langfuse_body: otel, langfuse_score_url: `${cfg.langfuse_host}/api/public/scores`, langfuse_score_body: score } }];

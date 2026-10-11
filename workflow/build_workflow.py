@@ -72,7 +72,7 @@ def sticky(name, text, pos, w, h, color):
 
 # ---- canvas -------------------------------------------------------------------------------------------
 Y = 460
-sticky("Note: Input", "## 1. Input & config\nPOST /webhook/mira with `{\"message\": \"...\"}`.\nAll settings (as-of date, models, prices, Langfuse) live in **Config + Input**.", (-40, 260), 460, 420, 7)
+sticky("Note: Input", "## 1. Input & config\nChat window (Chat with Mira) or POST /webhook/mira with `{\"message\": \"...\"}`.\nAll settings (as-of date, models, prices, Langfuse) live in **Config + Input**.", (-40, 260), 460, 420, 7)
 sticky("Note: Data", "## 2. Deterministic data layer\nProject files are parsed and every count, date and risk flag is computed **in code**. LLMs never do arithmetic.", (440, 260), 460, 420, 5)
 sticky("Note: Router", "## 3. Orchestrator (Router pattern)\nCheap model classifies intent + checks if there is enough data. Code guardrails override the model.", (920, 260), 880, 420, 6)
 sticky("Note: Agents", "## 4. Specialist agents\nEach gets only the data it needs. Vague inputs go to a rule-based Clarifier - no LLM, no guessing.", (1840, -100), 520, 1240, 4)
@@ -81,6 +81,11 @@ sticky("Note: Eval", "## 5. Evaluation & observability\nGrounding Check verifies
 wh = node("Webhook", "n8n-nodes-base.webhook", 2, (0, Y),
           {"httpMethod": "POST", "path": "mira", "responseMode": "responseNode", "options": {}},
           webhookId=str(uuid.uuid5(uuid.NAMESPACE_DNS, "mira-webhook")))
+chat = node("Chat with Mira", "@n8n/n8n-nodes-langchain.chatTrigger", 1.1, (0, Y + 200), {
+    "public": True, "mode": "hostedChat",
+    "initialMessages": "Hi, I'm Mira - your project intelligence assistant for the ABCDE Ltd. AI Adoption Project.\nTry: 'Which tasks are blocked or at risk?', 'Top 3 risks?', 'Status report for Sprint 3', 'Stakeholder email for Sprint 2' or 'Generate a project plan'.",
+    "options": {"responseMode": "responseNode", "title": "Mira", "subtitle": "AI Project Intelligence Assistant - answers only from project data", "inputPlaceholder": "Ask about plans, risks, status or milestones..."}},
+    webhookId=str(uuid.uuid5(uuid.NAMESPACE_DNS, "mira-chat")))
 c1 = code_node("Config + Input", "01_config_input.js", (220, Y))
 c2 = code_node("Load Project Data", "02_load_project_data.js", (480, Y))
 c3 = code_node("Compute Facts", "03_compute_facts.js", (700, Y))
@@ -141,7 +146,7 @@ resp = node("Respond to Webhook", "n8n-nodes-base.respondToWebhook", 1.1, (3440,
     "responseBody": "={{ JSON.stringify($('Grounding Check').first().json.response) }}",
     "options": {}})
 
-for a, b in [(wh, c1), (c1, c2), (c2, c3), (c3, c4), (c4, orch), (orch, c5), (c5, sw), (pkg, gc), (gc, iff), (lf, lfs), (lfs, resp)]:
+for a, b in [(wh, c1), (chat, c1), (c1, c2), (c2, c3), (c3, c4), (c4, orch), (orch, c5), (c5, sw), (pkg, gc), (gc, iff), (lf, lfs), (lfs, resp)]:
     connect(a, b)
 connect(iff, lf, 0)
 connect(iff, resp, 1)

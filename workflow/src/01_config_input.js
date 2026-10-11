@@ -2,7 +2,9 @@
 const item = $input.first().json;
 const body = item.body || {};
 const query = item.query || {};
-const message = String(body.message || body.chatInput || body.text || query.message || '').trim();
+// Sources: Webhook (body.message), n8n Chat Trigger (item.chatInput / item.sessionId), or query string
+const message = String(body.message || item.chatInput || body.chatInput || body.text || query.message || '').trim();
+const channel = item.chatInput !== undefined ? 'chat' : 'webhook';
 
 const config = {
   // "Today" for the project. The sample task board runs Apr–Aug 2026 and Sprint 3 is the active sprint,
@@ -31,7 +33,8 @@ return [{
     config,
     message,
     test_id: body.test_id || null,
-    session_id: body.session_id || null,
+    session_id: body.session_id || item.sessionId || null,
+    channel,
     trace_id: $execution.id ? `mira-${$execution.id}-${Date.now()}` : `mira-${Date.now()}`,
     started_at: new Date().toISOString(),
     started_ms: Date.now(),
