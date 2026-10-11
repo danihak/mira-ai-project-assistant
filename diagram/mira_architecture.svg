@@ -106,7 +106,7 @@
   <text x="58" y="775" class="h">4 · EVALUATION</text>
   <text x="58" y="802" class="t">Grounding Check (code evaluator)</text>
   <text x="58" y="824" class="s">every task ID, risk ID and date in the answer must exist in source data · sprint-scope check for emails</text>
-  <text x="58" y="842" class="s">adds tokens, latency, cost per agent · builds Langfuse trace + generations + "grounded" score</text>
+  <text x="58" y="842" class="s">adds tokens, latency, cost per agent · builds OpenTelemetry trace + "grounded" score for Langfuse</text>
 
   <!-- Output -->
   <rect x="300" y="900" width="600" height="70" rx="10" fill="#f2f4f7" stroke="#d0d5dd"/>
@@ -121,7 +121,7 @@
   <text x="1168" y="484" class="x">retry x3</text>
   <rect x="950" y="770" width="410" height="90" rx="10" fill="#fff" stroke="#667085" stroke-dasharray="6 4"/>
   <text x="968" y="800" class="t">Langfuse (observability)</text>
-  <text x="968" y="822" class="s">trace per request · generation per agent</text>
+  <text x="968" y="822" class="s">OTel trace per request · generation per agent</text>
   <text x="968" y="840" class="x">tokens, cost, latency, grounded score (0/1)</text>
 
   <!-- arrows -->

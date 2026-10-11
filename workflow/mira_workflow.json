@@ -67,7 +67,7 @@
     },
     {
       "parameters": {
-        "content": "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then logs trace + generations + score to Langfuse.",
+        "content": "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then sends an OpenTelemetry trace + a grounded score to Langfuse.",
         "width": 1180,
         "height": 420,
         "color": 3

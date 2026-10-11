@@ -44,9 +44,10 @@ Tested on n8n **2.42.6**. Uses only core nodes (Webhook, Code, HTTP Request, Swi
    The response is JSON: `answer`, `route`, `grounding` (passed + flags), per-agent `tokens / cost / latency`, `trace_id`.
 5. **Langfuse (observability)**
    - Create a project at [cloud.langfuse.com](https://cloud.langfuse.com) → *Settings* → *API keys*.
-   - In n8n, open **Log to Langfuse** → Authentication *Basic Auth* → new credential: **User = public key** (`pk-lf-…`), **Password = secret key** (`sk-lf-…`).
+   - In n8n, create a credential of type *Basic Auth*: **User = public key** (`pk-lf-…`), **Password = secret key** (`sk-lf-…`).
    - In **Config + Input**, set `langfuse_enabled: true` (and `langfuse_host` to `https://us.cloud.langfuse.com` if your project is in the US region).
-   - Note: Mira uses Langfuse's `/api/public/ingestion` endpoint (verified working on Langfuse Cloud, Oct 2026). Langfuse Cloud marks it as the legacy v3 API, so a future migration to its OpenTelemetry endpoint is on the backlog.
+   - Mira sends traces as **OpenTelemetry** spans to `/api/public/otel/v1/traces` (with header `x-langfuse-ingestion-version: 4`, so they appear immediately) and the `grounded` score to `/api/public/scores`. The legacy `/api/public/ingestion` API is not used; Langfuse Cloud retires it on 16 Nov 2026.
+   - Attach the same Langfuse credential to **Log to Langfuse** and **Log Score to Langfuse**.
    - Each request now shows as a trace `mira-request` with spans *Compute Facts (code)*, *Orchestrator*, the specialist agent, *Grounding Check (code)* and a `grounded` score.
 6. **Run the baseline test dataset** (Python 3, standard library only):
    ```bash

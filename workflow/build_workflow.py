@@ -76,7 +76,7 @@ sticky("Note: Input", "## 1. Input & config\nPOST /webhook/mira with `{\"message
 sticky("Note: Data", "## 2. Deterministic data layer\nProject files are parsed and every count, date and risk flag is computed **in code**. LLMs never do arithmetic.", (440, 260), 460, 420, 5)
 sticky("Note: Router", "## 3. Orchestrator (Router pattern)\nCheap model classifies intent + checks if there is enough data. Code guardrails override the model.", (920, 260), 880, 420, 6)
 sticky("Note: Agents", "## 4. Specialist agents\nEach gets only the data it needs. Vague inputs go to a rule-based Clarifier - no LLM, no guessing.", (1840, -100), 520, 1240, 4)
-sticky("Note: Eval", "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then logs trace + generations + score to Langfuse.", (2400, 260), 1180, 420, 3)
+sticky("Note: Eval", "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then sends an OpenTelemetry trace + a grounded score to Langfuse.", (2400, 260), 1180, 420, 3)
 
 wh = node("Webhook", "n8n-nodes-base.webhook", 2, (0, Y),
           {"httpMethod": "POST", "path": "mira", "responseMode": "responseNode", "options": {}},
