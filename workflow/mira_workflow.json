@@ -68,7 +68,7 @@
     {
       "parameters": {
         "content": "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then logs trace + generations + score to Langfuse.",
-        "width": 980,
+        "width": 1180,
         "height": 420,
         "color": 3
       },
@@ -567,7 +567,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Grounding Check \u2014 automatic post-generation evaluator. Every task ID, risk ID and date in the answer must exist\n// in the source data; stakeholder emails may only mention in-scope sprint tasks. Flags are returned with the answer\n// and sent to Langfuse, so hallucinations show up in traces and metrics.\nconst ctx = $input.first().json;\nconst { facts, router, config: cfg } = ctx;\nconst answer = ctx.answer || '';\nconst uniq = a => [...new Set(a)];\nconst flags = [];\n\nconst taskIds = uniq(answer.match(/\\bT0\\d{2}\\b/g) || []);\nconst riskIds = uniq(answer.match(/\\bR\\d{2}\\b/g) || []);\nconst dates = uniq(answer.match(/\\b20\\d{2}-\\d{2}-\\d{2}\\b/g) || []);\n\ntaskIds.filter(id => !facts.all_task_ids.includes(id)).forEach(id => flags.push(`Unknown task ID ${id}`));\nriskIds.filter(id => !facts.all_risk_ids.includes(id)).forEach(id => flags.push(`Unknown risk ID ${id}`));\n\nconst knownDates = new Set([\n  facts.report_date, facts.project_start, facts.project_end,\n  ...Object.values(facts.by_sprint).flatMap(s => s.tasks.map(t => t.due)),\n  ...facts.phases.flatMap(p => [p.start_date, p.end_date]),\n]);\nif (router.project_ref === 'abcde') dates.filter(d => !knownDates.has(d)).forEach(d => flags.push(`Date ${d} not found in source data`));\n\nif (router.route === 'stakeholder_update' && ctx.scope_task_ids) {\n  taskIds.filter(id => !ctx.scope_task_ids.includes(id)).forEach(id => flags.push(`Out-of-scope task ${id} mentioned in sprint update`));\n}\nif (router.route === 'status' && router.sprint && ctx.scope_task_ids) {\n  const allowed = new Set([...ctx.scope_task_ids, ...facts.overdue.map(t => t.id), ...facts.blocked.map(t => t.id), ...facts.at_risk.map(t => t.id)]);\n  taskIds.filter(id => !allowed.has(id)).forEach(id => flags.push(`Task ${id} is outside the requested scope`));\n}\n// v2 completeness checks (after baseline run 1, where T8 silently dropped an at-risk task):\n// every alert task must be mentioned (by ID or name) in milestone answers; every in-scope task in sprint reports/emails.\nconst allTaskList = Object.values(facts.by_sprint).flatMap(s => s.tasks);\nconst mentioned = id => { const t = allTaskList.find(x => x.id === id); return answer.includes(id) || (t && answer.toLowerCase().includes(t.name.toLowerCase())); };\nif (router.route === 'milestone') {\n  [...facts.blocked, ...facts.overdue, ...facts.at_risk].map(t => t.id).filter(id => !mentioned(id)).forEach(id => flags.push(`Omitted alert task ${id}`));\n}\nif ((router.route === 'stakeholder_update' || (router.route === 'status' && router.sprint)) && ctx.scope_task_ids) {\n  ctx.scope_task_ids.filter(id => !mentioned(id)).forEach(id => flags.push(`Omitted in-scope task ${id}`));\n}\nconst notes = [];\nif (router.route !== 'clarify' && router.project_ref !== 'abcde') notes.push('Answer is based only on user-supplied details (no project files loaded) - review before sharing');\n\n// Cost per call (USD) from the price table in Config\nconst price = m => cfg.prices[Object.keys(cfg.prices).find(k => (m || '').startsWith(k))] || { input: 0, output: 0 };\nconst agents = ctx.calls.map(c => ({\n  agent: c.agent, model: c.model, input_tokens: c.input_tokens, output_tokens: c.output_tokens, latency_ms: c.latency_ms,\n  cost_usd: Number(((c.input_tokens * price(c.model).input + c.output_tokens * price(c.model).output) / 1e6).toFixed(6)),\n}));\nconst totals = agents.reduce((a, c) => ({\n  input_tokens: a.input_tokens + c.input_tokens, output_tokens: a.output_tokens + c.output_tokens,\n  cost_usd: Number((a.cost_usd + c.cost_usd).toFixed(6)),\n}), { input_tokens: 0, output_tokens: 0, cost_usd: 0 });\ntotals.latency_ms = Date.now() - ctx.started_ms;\n\nconst grounding = { passed: flags.length === 0, flags, notes, task_ids_cited: taskIds, risk_ids_cited: riskIds };\nconst response = {\n  test_id: ctx.test_id, request: ctx.message, as_of_date: facts.report_date,\n  route: router.route, intent: router.intent, project_ref: router.project_ref, sprint: router.sprint,\n  router_reason: router.reason, guardrails: router.guardrails,\n  answer, grounding, agents, totals, trace_id: ctx.trace_id,\n};\n\n// Langfuse ingestion batch: 1 trace + 1 generation per LLM call + spans for the deterministic steps\nconst now = new Date().toISOString();\nconst ev = (type, body, i) => ({ id: `${ctx.trace_id}-${i}`, timestamp: now, type, body });\nconst batch = [\n  ev('trace-create', {\n    id: ctx.trace_id, name: 'mira-request', input: ctx.message, output: answer, sessionId: ctx.session_id || undefined,\n    tags: ['mira', `route:${router.route}`, grounding.passed ? 'grounded' : 'grounding-flags'],\n    metadata: { test_id: ctx.test_id, router, grounding, totals, as_of_date: facts.report_date },\n  }, 0),\n  ev('span-create', { id: `${ctx.trace_id}-facts`, traceId: ctx.trace_id, name: 'Compute Facts (code)', startTime: ctx.started_at, endTime: new Date(Date.parse(ctx.started_at) + (ctx.facts_ms || 0)).toISOString(), output: { status_counts: facts.status_counts, health: facts.health } }, 1),\n  ...ctx.calls.map((c, i) => c.model.startsWith('none')\n    ? ev('span-create', { id: `${ctx.trace_id}-call${i}`, traceId: ctx.trace_id, name: c.agent, startTime: c.start_time, endTime: c.end_time, input: c.input, output: c.output }, 2 + i)\n    : ev('generation-create', {\n      id: `${ctx.trace_id}-call${i}`, traceId: ctx.trace_id, name: c.agent, model: c.model, startTime: c.start_time, endTime: c.end_time,\n      input: c.input, output: c.output,\n      usage: { input: c.input_tokens, output: c.output_tokens, total: c.input_tokens + c.output_tokens, unit: 'TOKENS' },\n      usageDetails: { input: c.input_tokens, output: c.output_tokens },\n      costDetails: { total: agents[i].cost_usd },\n      metadata: { cost_usd: agents[i].cost_usd },\n    }, 2 + i)),\n  ev('span-create', { id: `${ctx.trace_id}-ground`, traceId: ctx.trace_id, name: 'Grounding Check (code)', startTime: now, endTime: new Date().toISOString(), output: grounding, level: grounding.passed ? 'DEFAULT' : 'WARNING' }, 9),\n  ev('score-create', { id: `${ctx.trace_id}-score`, traceId: ctx.trace_id, name: 'grounded', value: grounding.passed ? 1 : 0, comment: flags.join('; ') || 'all cited IDs and dates found in source data' }, 10),\n];\n\nreturn [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/ingestion`, langfuse_body: { batch } } }];\n"
+        "jsCode": "// Grounding Check \u2014 automatic post-generation evaluator. Every task ID, risk ID and date in the answer must exist\n// in the source data; stakeholder emails may only mention in-scope sprint tasks. Flags are returned with the answer\n// and sent to Langfuse, so hallucinations show up in traces and metrics.\nconst ctx = $input.first().json;\nconst { facts, router, config: cfg } = ctx;\nconst answer = ctx.answer || '';\nconst uniq = a => [...new Set(a)];\nconst flags = [];\n\nconst taskIds = uniq(answer.match(/\\bT0\\d{2}\\b/g) || []);\nconst riskIds = uniq(answer.match(/\\bR\\d{2}\\b/g) || []);\nconst dates = uniq(answer.match(/\\b20\\d{2}-\\d{2}-\\d{2}\\b/g) || []);\n\ntaskIds.filter(id => !facts.all_task_ids.includes(id)).forEach(id => flags.push(`Unknown task ID ${id}`));\nriskIds.filter(id => !facts.all_risk_ids.includes(id)).forEach(id => flags.push(`Unknown risk ID ${id}`));\n\nconst knownDates = new Set([\n  facts.report_date, facts.project_start, facts.project_end,\n  ...Object.values(facts.by_sprint).flatMap(s => s.tasks.map(t => t.due)),\n  ...facts.phases.flatMap(p => [p.start_date, p.end_date]),\n]);\nif (router.project_ref === 'abcde') dates.filter(d => !knownDates.has(d)).forEach(d => flags.push(`Date ${d} not found in source data`));\n\nif (router.route === 'stakeholder_update' && ctx.scope_task_ids) {\n  taskIds.filter(id => !ctx.scope_task_ids.includes(id)).forEach(id => flags.push(`Out-of-scope task ${id} mentioned in sprint update`));\n}\nif (router.route === 'status' && router.sprint && ctx.scope_task_ids) {\n  const allowed = new Set([...ctx.scope_task_ids, ...facts.overdue.map(t => t.id), ...facts.blocked.map(t => t.id), ...facts.at_risk.map(t => t.id)]);\n  taskIds.filter(id => !allowed.has(id)).forEach(id => flags.push(`Task ${id} is outside the requested scope`));\n}\n// v2 completeness checks (after baseline run 1, where T8 silently dropped an at-risk task):\n// every alert task must be mentioned (by ID or name) in milestone answers; every in-scope task in sprint reports/emails.\nconst allTaskList = Object.values(facts.by_sprint).flatMap(s => s.tasks);\nconst mentioned = id => { const t = allTaskList.find(x => x.id === id); return answer.includes(id) || (t && answer.toLowerCase().includes(t.name.toLowerCase())); };\nif (router.route === 'milestone') {\n  [...facts.blocked, ...facts.overdue, ...facts.at_risk].map(t => t.id).filter(id => !mentioned(id)).forEach(id => flags.push(`Omitted alert task ${id}`));\n}\nif ((router.route === 'stakeholder_update' || (router.route === 'status' && router.sprint)) && ctx.scope_task_ids) {\n  ctx.scope_task_ids.filter(id => !mentioned(id)).forEach(id => flags.push(`Omitted in-scope task ${id}`));\n}\nconst notes = [];\nif (router.route !== 'clarify' && router.project_ref !== 'abcde') notes.push('Answer is based only on user-supplied details (no project files loaded) - review before sharing');\n\n// Cost per call (USD) from the price table in Config\nconst price = m => cfg.prices[Object.keys(cfg.prices).find(k => (m || '').startsWith(k))] || { input: 0, output: 0 };\nconst agents = ctx.calls.map(c => ({\n  agent: c.agent, model: c.model, input_tokens: c.input_tokens, output_tokens: c.output_tokens, latency_ms: c.latency_ms,\n  cost_usd: Number(((c.input_tokens * price(c.model).input + c.output_tokens * price(c.model).output) / 1e6).toFixed(6)),\n}));\nconst totals = agents.reduce((a, c) => ({\n  input_tokens: a.input_tokens + c.input_tokens, output_tokens: a.output_tokens + c.output_tokens,\n  cost_usd: Number((a.cost_usd + c.cost_usd).toFixed(6)),\n}), { input_tokens: 0, output_tokens: 0, cost_usd: 0 });\ntotals.latency_ms = Date.now() - ctx.started_ms;\n\nconst grounding = { passed: flags.length === 0, flags, notes, task_ids_cited: taskIds, risk_ids_cited: riskIds };\nconst response = {\n  test_id: ctx.test_id, request: ctx.message, as_of_date: facts.report_date,\n  route: router.route, intent: router.intent, project_ref: router.project_ref, sprint: router.sprint,\n  router_reason: router.reason, guardrails: router.guardrails,\n  answer, grounding, agents, totals, trace_id: ctx.trace_id,\n};\n\n// Langfuse via OpenTelemetry (OTLP/HTTP JSON) - one trace per request:\n//   root \"mira-request\" (agent) -> Compute Facts (span) -> Orchestrator (generation) -> specialist (generation, or span\n//   for the rule-based Clarifier) -> Grounding Check (guardrail). The grounded score goes to the Scores API separately.\n// (v3: moved off the legacy /api/public/ingestion endpoint, which Langfuse Cloud retires on 16 Nov 2026.)\nconst hex = n => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');\nconst traceId = hex(32), rootId = hex(16);\nconst ns = iso => `${Date.parse(iso)}000000`;\nconst str = v => (typeof v === 'string' ? v : JSON.stringify(v));\nconst attr = (key, v) => (Array.isArray(v) ? { key, value: { arrayValue: { values: v.map(x => ({ stringValue: String(x) })) } } }\n  : typeof v === 'number' ? { key, value: { intValue: Math.round(v) } } : { key, value: { stringValue: str(v) } });\nconst span = (name, parent, start, end, type, attrs) => ({\n  traceId, spanId: parent === null ? rootId : hex(16), ...(parent ? { parentSpanId: parent } : {}), name, kind: 1,\n  startTimeUnixNano: ns(start), endTimeUnixNano: ns(end),\n  attributes: [attr('langfuse.observation.type', type), ...attrs], status: {},\n});\nconst endIso = new Date().toISOString();\nconst tags = ['mira', `route:${router.route}`, grounding.passed ? 'grounded' : 'grounding-flags'];\nconst spans = [\n  span('mira-request', null, ctx.started_at, endIso, 'agent', [\n    attr('langfuse.trace.name', 'mira-request'), attr('langfuse.trace.tags', tags),\n    ...(ctx.session_id ? [attr('langfuse.session.id', ctx.session_id)] : []),\n    attr('langfuse.observation.input', ctx.message), attr('langfuse.observation.output', answer),\n    attr('langfuse.trace.metadata.test_id', ctx.test_id || ''), attr('langfuse.trace.metadata.route', router.route),\n    attr('langfuse.trace.metadata.grounded', String(grounding.passed)), attr('langfuse.trace.metadata.cost_usd', String(totals.cost_usd)),\n    attr('langfuse.trace.metadata.as_of_date', facts.report_date),\n  ]),\n  span('Compute Facts (code)', rootId, ctx.started_at, new Date(Date.parse(ctx.started_at) + (ctx.facts_ms || 1)).toISOString(), 'span', [\n    attr('langfuse.observation.output', { status_counts: facts.status_counts, health: facts.health, blocked: facts.blocked.map(t => t.id), overdue: facts.overdue.map(t => t.id) }),\n  ]),\n  ...ctx.calls.map((c, i) => c.model.startsWith('none')\n    ? span(c.agent, rootId, c.start_time, c.end_time, 'guardrail', [attr('langfuse.observation.input', c.input), attr('langfuse.observation.output', c.output)])\n    : span(c.agent, rootId, c.start_time, c.end_time, 'generation', [\n      attr('langfuse.observation.model.name', c.model), attr('langfuse.observation.input', c.input), attr('langfuse.observation.output', c.output),\n      attr('langfuse.observation.usage_details', { input: c.input_tokens, output: c.output_tokens, total: c.input_tokens + c.output_tokens }),\n      attr('langfuse.observation.cost_details', { total: agents[i].cost_usd }),\n    ])),\n  span('Grounding Check (code)', rootId, endIso, new Date(Date.parse(endIso) + 1).toISOString(), 'evaluator', [\n    attr('langfuse.observation.output', grounding), attr('langfuse.observation.level', grounding.passed ? 'DEFAULT' : 'WARNING'),\n  ]),\n];\nconst otel = { resourceSpans: [{ resource: { attributes: [attr('service.name', 'mira-n8n')] }, scopeSpans: [{ scope: { name: 'mira' }, spans }] }] };\nconst score = { traceId, name: 'grounded', value: grounding.passed ? 1 : 0, dataType: 'NUMERIC', comment: flags.join('; ') || 'all cited IDs and dates found in source data' };\nresponse.langfuse_trace_id = traceId;\n\nreturn [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/otel/v1/traces`, langfuse_body: otel, langfuse_score_url: `${cfg.langfuse_host}/api/public/scores`, langfuse_score_body: score } }];\n"
       },
       "id": "0056e797-005c-5128-9d7c-8928f198cb40",
       "name": "Grounding Check",
@@ -618,6 +618,15 @@
         "url": "={{ $json.langfuse_url }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-langfuse-ingestion-version",
+              "value": "4"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.langfuse_body) }}",
@@ -637,6 +646,29 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "={{ $('Grounding Check').first().json.langfuse_score_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Grounding Check').first().json.langfuse_score_body) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "1294877b-a299-5a4e-acb9-7436797be168",
+      "name": "Log Score to Langfuse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3340,
+        350
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
         "respondWith": "json",
         "responseBody": "={{ JSON.stringify($('Grounding Check').first().json.response) }}",
         "options": {}
@@ -646,8 +678,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        3200,
-        520
+        3440,
+        540
       ]
     }
   ],
@@ -919,6 +951,17 @@
       ]
     },
     "Log to Langfuse": {
+      "main": [
+        [
+          {
+            "node": "Log Score to Langfuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Score to Langfuse": {
       "main": [
         [
           {

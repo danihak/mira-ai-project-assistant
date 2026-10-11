@@ -76,7 +76,7 @@ sticky("Note: Input", "## 1. Input & config\nPOST /webhook/mira with `{\"message
 sticky("Note: Data", "## 2. Deterministic data layer\nProject files are parsed and every count, date and risk flag is computed **in code**. LLMs never do arithmetic.", (440, 260), 460, 420, 5)
 sticky("Note: Router", "## 3. Orchestrator (Router pattern)\nCheap model classifies intent + checks if there is enough data. Code guardrails override the model.", (920, 260), 880, 420, 6)
 sticky("Note: Agents", "## 4. Specialist agents\nEach gets only the data it needs. Vague inputs go to a rule-based Clarifier - no LLM, no guessing.", (1840, -100), 520, 1240, 4)
-sticky("Note: Eval", "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then logs trace + generations + score to Langfuse.", (2400, 260), 980, 420, 3)
+sticky("Note: Eval", "## 5. Evaluation & observability\nGrounding Check verifies every task ID, risk ID and date against the source data, then logs trace + generations + score to Langfuse.", (2400, 260), 1180, 420, 3)
 
 wh = node("Webhook", "n8n-nodes-base.webhook", 2, (0, Y),
           {"httpMethod": "POST", "path": "mira", "responseMode": "responseNode", "options": {}},
@@ -123,18 +123,25 @@ iff = node("Langfuse Enabled?", "n8n-nodes-base.if", 2.2, (2900, Y), {
                    "conditions": [{"id": "lf-enabled", "leftValue": "={{ $json.langfuse_enabled }}", "rightValue": "",
                                     "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
                    "combinator": "and"}, "options": {}})
+LF_CRED = {"credentials": {"httpBasicAuth": {"id": "miraLangfuseLocal", "name": "Langfuse"}}} if "--langfuse" in sys.argv else {}
 lf = node("Log to Langfuse", "n8n-nodes-base.httpRequest", 4.2, (3120, Y - 110), {
     "method": "POST", "url": "={{ $json.langfuse_url }}",
     "authentication": "genericCredentialType", "genericAuthType": "httpBasicAuth",
+    "sendHeaders": True, "headerParameters": {"parameters": [{"name": "x-langfuse-ingestion-version", "value": "4"}]},
     "sendBody": True, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json.langfuse_body) }}",
     "options": {"timeout": 20000}},
     onError="continueRegularOutput", **({"credentials": {"httpBasicAuth": {"id": "miraLangfuseLocal", "name": "Langfuse"}}} if "--langfuse" in sys.argv else {}))  # attach a Basic Auth credential (public key / secret key) when enabling Langfuse
-resp = node("Respond to Webhook", "n8n-nodes-base.respondToWebhook", 1.1, (3200, Y + 60), {
+lfs = node("Log Score to Langfuse", "n8n-nodes-base.httpRequest", 4.2, (3340, Y - 110), {
+    "method": "POST", "url": "={{ $('Grounding Check').first().json.langfuse_score_url }}",
+    "authentication": "genericCredentialType", "genericAuthType": "httpBasicAuth",
+    "sendBody": True, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($('Grounding Check').first().json.langfuse_score_body) }}",
+    "options": {"timeout": 20000}}, onError="continueRegularOutput", **LF_CRED)
+resp = node("Respond to Webhook", "n8n-nodes-base.respondToWebhook", 1.1, (3440, Y + 80), {
     "respondWith": "json",
     "responseBody": "={{ JSON.stringify($('Grounding Check').first().json.response) }}",
     "options": {}})
 
-for a, b in [(wh, c1), (c1, c2), (c2, c3), (c3, c4), (c4, orch), (orch, c5), (c5, sw), (pkg, gc), (gc, iff), (lf, resp)]:
+for a, b in [(wh, c1), (c1, c2), (c2, c3), (c3, c4), (c4, orch), (orch, c5), (c5, sw), (pkg, gc), (gc, iff), (lf, lfs), (lfs, resp)]:
     connect(a, b)
 connect(iff, lf, 0)
 connect(iff, resp, 1)

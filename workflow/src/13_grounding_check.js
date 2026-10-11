@@ -61,28 +61,48 @@ const response = {
   answer, grounding, agents, totals, trace_id: ctx.trace_id,
 };
 
-// Langfuse ingestion batch: 1 trace + 1 generation per LLM call + spans for the deterministic steps
-const now = new Date().toISOString();
-const ev = (type, body, i) => ({ id: `${ctx.trace_id}-${i}`, timestamp: now, type, body });
-const batch = [
-  ev('trace-create', {
-    id: ctx.trace_id, name: 'mira-request', input: ctx.message, output: answer, sessionId: ctx.session_id || undefined,
-    tags: ['mira', `route:${router.route}`, grounding.passed ? 'grounded' : 'grounding-flags'],
-    metadata: { test_id: ctx.test_id, router, grounding, totals, as_of_date: facts.report_date },
-  }, 0),
-  ev('span-create', { id: `${ctx.trace_id}-facts`, traceId: ctx.trace_id, name: 'Compute Facts (code)', startTime: ctx.started_at, endTime: new Date(Date.parse(ctx.started_at) + (ctx.facts_ms || 0)).toISOString(), output: { status_counts: facts.status_counts, health: facts.health } }, 1),
+// Langfuse via OpenTelemetry (OTLP/HTTP JSON) - one trace per request:
+//   root "mira-request" (agent) -> Compute Facts (span) -> Orchestrator (generation) -> specialist (generation, or span
+//   for the rule-based Clarifier) -> Grounding Check (guardrail). The grounded score goes to the Scores API separately.
+// (v3: moved off the legacy /api/public/ingestion endpoint, which Langfuse Cloud retires on 16 Nov 2026.)
+const hex = n => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+const traceId = hex(32), rootId = hex(16);
+const ns = iso => `${Date.parse(iso)}000000`;
+const str = v => (typeof v === 'string' ? v : JSON.stringify(v));
+const attr = (key, v) => (Array.isArray(v) ? { key, value: { arrayValue: { values: v.map(x => ({ stringValue: String(x) })) } } }
+  : typeof v === 'number' ? { key, value: { intValue: Math.round(v) } } : { key, value: { stringValue: str(v) } });
+const span = (name, parent, start, end, type, attrs) => ({
+  traceId, spanId: parent === null ? rootId : hex(16), ...(parent ? { parentSpanId: parent } : {}), name, kind: 1,
+  startTimeUnixNano: ns(start), endTimeUnixNano: ns(end),
+  attributes: [attr('langfuse.observation.type', type), ...attrs], status: {},
+});
+const endIso = new Date().toISOString();
+const tags = ['mira', `route:${router.route}`, grounding.passed ? 'grounded' : 'grounding-flags'];
+const spans = [
+  span('mira-request', null, ctx.started_at, endIso, 'agent', [
+    attr('langfuse.trace.name', 'mira-request'), attr('langfuse.trace.tags', tags),
+    ...(ctx.session_id ? [attr('langfuse.session.id', ctx.session_id)] : []),
+    attr('langfuse.observation.input', ctx.message), attr('langfuse.observation.output', answer),
+    attr('langfuse.trace.metadata.test_id', ctx.test_id || ''), attr('langfuse.trace.metadata.route', router.route),
+    attr('langfuse.trace.metadata.grounded', String(grounding.passed)), attr('langfuse.trace.metadata.cost_usd', String(totals.cost_usd)),
+    attr('langfuse.trace.metadata.as_of_date', facts.report_date),
+  ]),
+  span('Compute Facts (code)', rootId, ctx.started_at, new Date(Date.parse(ctx.started_at) + (ctx.facts_ms || 1)).toISOString(), 'span', [
+    attr('langfuse.observation.output', { status_counts: facts.status_counts, health: facts.health, blocked: facts.blocked.map(t => t.id), overdue: facts.overdue.map(t => t.id) }),
+  ]),
   ...ctx.calls.map((c, i) => c.model.startsWith('none')
-    ? ev('span-create', { id: `${ctx.trace_id}-call${i}`, traceId: ctx.trace_id, name: c.agent, startTime: c.start_time, endTime: c.end_time, input: c.input, output: c.output }, 2 + i)
-    : ev('generation-create', {
-      id: `${ctx.trace_id}-call${i}`, traceId: ctx.trace_id, name: c.agent, model: c.model, startTime: c.start_time, endTime: c.end_time,
-      input: c.input, output: c.output,
-      usage: { input: c.input_tokens, output: c.output_tokens, total: c.input_tokens + c.output_tokens, unit: 'TOKENS' },
-      usageDetails: { input: c.input_tokens, output: c.output_tokens },
-      costDetails: { total: agents[i].cost_usd },
-      metadata: { cost_usd: agents[i].cost_usd },
-    }, 2 + i)),
-  ev('span-create', { id: `${ctx.trace_id}-ground`, traceId: ctx.trace_id, name: 'Grounding Check (code)', startTime: now, endTime: new Date().toISOString(), output: grounding, level: grounding.passed ? 'DEFAULT' : 'WARNING' }, 9),
-  ev('score-create', { id: `${ctx.trace_id}-score`, traceId: ctx.trace_id, name: 'grounded', value: grounding.passed ? 1 : 0, comment: flags.join('; ') || 'all cited IDs and dates found in source data' }, 10),
+    ? span(c.agent, rootId, c.start_time, c.end_time, 'guardrail', [attr('langfuse.observation.input', c.input), attr('langfuse.observation.output', c.output)])
+    : span(c.agent, rootId, c.start_time, c.end_time, 'generation', [
+      attr('langfuse.observation.model.name', c.model), attr('langfuse.observation.input', c.input), attr('langfuse.observation.output', c.output),
+      attr('langfuse.observation.usage_details', { input: c.input_tokens, output: c.output_tokens, total: c.input_tokens + c.output_tokens }),
+      attr('langfuse.observation.cost_details', { total: agents[i].cost_usd }),
+    ])),
+  span('Grounding Check (code)', rootId, endIso, new Date(Date.parse(endIso) + 1).toISOString(), 'evaluator', [
+    attr('langfuse.observation.output', grounding), attr('langfuse.observation.level', grounding.passed ? 'DEFAULT' : 'WARNING'),
+  ]),
 ];
+const otel = { resourceSpans: [{ resource: { attributes: [attr('service.name', 'mira-n8n')] }, scopeSpans: [{ scope: { name: 'mira' }, spans }] }] };
+const score = { traceId, name: 'grounded', value: grounding.passed ? 1 : 0, dataType: 'NUMERIC', comment: flags.join('; ') || 'all cited IDs and dates found in source data' };
+response.langfuse_trace_id = traceId;
 
-return [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/ingestion`, langfuse_body: { batch } } }];
+return [{ json: { response, langfuse_enabled: !!cfg.langfuse_enabled, langfuse_url: `${cfg.langfuse_host}/api/public/otel/v1/traces`, langfuse_body: otel, langfuse_score_url: `${cfg.langfuse_host}/api/public/scores`, langfuse_score_body: score } }];
