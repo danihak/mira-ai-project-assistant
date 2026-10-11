@@ -69,7 +69,7 @@ const hex = n => Array.from({ length: n }, () => Math.floor(Math.random() * 16).
 const traceId = hex(32), rootId = hex(16);
 const ns = iso => `${Date.parse(iso)}000000`;
 const str = v => (typeof v === 'string' ? v : JSON.stringify(v));
-const attr = (key, v) => (Array.isArray(v) ? { key, value: { arrayValue: { values: v.map(x => ({ stringValue: String(x) })) } } }
+const attr = (key, v) => (Array.isArray(v) && v.every(x => typeof x === 'string') ? { key, value: { arrayValue: { values: v.map(x => ({ stringValue: String(x) })) } } }
   : typeof v === 'number' ? { key, value: { intValue: Math.round(v) } } : { key, value: { stringValue: str(v) } });
 const span = (name, parent, start, end, type, attrs) => ({
   traceId, spanId: parent === null ? rootId : hex(16), ...(parent ? { parentSpanId: parent } : {}), name, kind: 1,
