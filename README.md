@@ -27,7 +27,7 @@ tests/run_tests.py               ← runs the 12 baseline inputs, auto-checks, w
 tests/mock_openai_server.py      ← offline mock of OpenAI + Langfuse for plumbing tests
 tests/results/                   ← baseline_results.md + results.json (after you run the tests)
 docs/Q1_ideation.md  docs/Q2_architecture_writeup.md  docs/Q3_program_charter.md  docs/Q4_reflection.md
-diagram/mira_architecture.png    diagram/n8n_canvas.png
+diagram/mira_architecture.png    screenshots/  (canvas, chat, Langfuse)
 ```
 
 ## Setup (about 10 minutes)
@@ -63,6 +63,18 @@ Tested on n8n **2.42.6**. Uses only core nodes (Webhook, Code, HTTP Request, Swi
 - **LLM judge:** in Langfuse, Evaluators → `faithfulness` (gpt-4.1-mini, score 0–1), with a rule on observations `type:GENERATION -name:Orchestrator`. It needs an OpenAI LLM connection in Langfuse settings.
 - **Dashboard:** "Mira - Production Metrics" shows scores, score trend, latency percentiles per agent, cost per agent and request mix.
 
+## Screenshots
+| | |
+|---|---|
+| **Workflow canvas** (n8n) | ![canvas](screenshots/01_workflow_canvas.png) |
+| **Mira in action: milestone alerts** (chat window) | ![alerts](screenshots/02_mira_in_action_alerts.png) |
+| **Mira in action: audit footer** (route, grounding, tokens, cost) | ![footer](screenshots/03_mira_in_action_audit_footer.png) |
+| **Mira in action: vague request goes to the Clarifier** (no LLM, no guessing) | ![clarify](screenshots/04_mira_refuses_vague_request.png) |
+| **Langfuse trace tree**: Orchestrator → specialist → Grounding Check, `grounded` and `faithfulness` scores | ![trace](screenshots/05_langfuse_trace_tree.png) |
+| **Langfuse experiments**: v1 vs v2 runs on the 12-item dataset | ![experiments](screenshots/06_langfuse_experiments_v1_vs_v2.png) |
+| **Langfuse experiment scores**: grounded v1 Ø0.83 → v2 Ø1.00 | ![scores](screenshots/07_langfuse_experiment_scores.png) |
+| **Langfuse dashboard**: "Mira - Production Metrics" | ![dashboard](screenshots/08_langfuse_dashboard.png) |
+
 ## Configuration (node *Config + Input*)
 | Setting | Default | Why |
 |---|---|---|
@@ -88,7 +100,7 @@ Change a prompt in `prompts/` or code in `workflow/src/`, run `python3 workflow/
 - [x] Write-up with tool rationale, pattern, agents, cost analysis and metrics — `docs/Q2_architecture_writeup.md`
 - [x] Q1 Ideation, Q3 Program Charter, Q4 Reflection — `docs/`
 - [x] Baseline results (all 12), two live runs: `tests/results/run1_baseline_results.md` (11/12) → `tests/results/baseline_results.md` (12/12 after fixes)
-- [ ] Screenshots — workflow canvas, Mira in action (n8n *Executions* view), Langfuse traces → `screenshots/`
+- [x] Screenshots: workflow canvas, Mira in action (chat window), Langfuse traces, experiments and dashboard → `screenshots/`
 - [ ] Slide deck
 - [ ] Public GitHub link submitted
 
