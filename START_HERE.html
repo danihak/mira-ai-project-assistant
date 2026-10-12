@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mira Capstone Guide</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1d2433; --muted:#5b6475; --line:#e3e6ec; --accent:#3b5bdb; --soft:#f4f6fb; --ok:#2b8a3e; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#14161b; --fg:#e6e8ee; --muted:#9aa3b2; --line:#2b2f38; --accent:#8da2fb; --soft:#1c1f26; --ok:#69db7c; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width:920px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  h2 { font-size:20px; margin:36px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  a { color:var(--accent); }
+  .box { background:var(--soft); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin:16px 0; }
+  .btns a { display:inline-block; margin:4px 8px 4px 0; padding:8px 14px; border:1px solid var(--accent); border-radius:8px; text-decoration:none; font-weight:600; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  th, td { text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  .wrap { overflow-x:auto; }
+  code { background:var(--soft); border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:14px; }
+  ol li, ul li { margin:4px 0; }
+  .num { font-size:24px; font-weight:700; color:var(--ok); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; }
+  .grid .box { margin:0; }
+  .small { color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Mira: AI Project Intelligence Assistant</h1>
+<p class="sub">Capstone project, Applied Agentic AI for PMs/TPMs &middot; Author: Danish</p>
+
+<div class="box">
+  <strong>Start here.</strong> This page is a guide to the ZIP. Every link has two versions: <em>local</em> (opens the file inside this extracted folder) and <em>GitHub</em> (opens it online, no download needed).
+  <div class="btns" style="margin-top:10px">
+    <a href="https://github.com/danihak/mira-ai-project-assistant" target="_blank" rel="noopener">GitHub repository</a>
+    <a href="docs/Mira_Q1-Q4_Submission.pdf">Q1&ndash;Q4 write-up (PDF)</a>
+    <a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/README.md" target="_blank" rel="noopener">README on GitHub</a>
+  </div>
+</div>
+
+<h2>1. What Mira is, in one paragraph</h2>
+<p>Mira is a multi-agent workflow built in <strong>n8n</strong>. A project manager asks a question in plain English (for example, "Which tasks are blocked or at risk?"). An <strong>Orchestrator</strong> agent works out what kind of request it is and routes it to one of five specialist agents: <strong>Planner, Risk Assessor, Status Reporter, Milestone Tracker</strong> and <strong>Stakeholder Update</strong>. Vague requests go to a rule-based <strong>Clarifier</strong>, which asks for detail instead of guessing. All counting and date maths happen in code, so the AI only explains numbers it was given. A <strong>Grounding Check</strong> then verifies every task ID, risk ID and date in the answer against the project files. Every request is traced in <strong>Langfuse</strong> with cost, tokens, latency and quality scores.</p>
+
+<h2>2. Results at a glance</h2>
+<div class="grid">
+  <div class="box"><div class="num">12 / 12</div>baseline test inputs passed (after fixes; first run was 11/12)</div>
+  <div class="box"><div class="num">0.83 &rarr; 1.00</div>grounded score, v1 vs v2, in a Langfuse experiment</div>
+  <div class="box"><div class="num">~$0.0008</div>average cost per request (gpt-4o-mini)</div>
+  <div class="box"><div class="num">~$0.26</div>estimated cost per PM per month</div>
+</div>
+
+<h2>3. Suggested review order (about 10 minutes)</h2>
+<ol>
+  <li>Look at the <a href="diagram/mira_architecture.png">architecture diagram</a> (<a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/diagram/mira_architecture.png" target="_blank" rel="noopener">GitHub</a>).</li>
+  <li>See Mira working: <a href="screenshots/02_mira_in_action_alerts.png">milestone alerts</a>, <a href="screenshots/03_mira_in_action_audit_footer.png">audit footer</a>, <a href="screenshots/04_mira_refuses_vague_request.png">vague request handled</a>.</li>
+  <li>See the observability: <a href="screenshots/05_langfuse_trace_tree.png">Langfuse trace</a>, <a href="screenshots/07_langfuse_experiment_scores.png">v1 vs v2 experiment</a>, <a href="screenshots/08_langfuse_dashboard.png">dashboard</a>.</li>
+  <li>Read the <a href="tests/results/baseline_results.md">baseline results for all 12 inputs</a> (<a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/tests/results/baseline_results.md" target="_blank" rel="noopener">GitHub</a>).</li>
+  <li>Read the <a href="docs/Mira_Q1-Q4_Submission.pdf">Q1&ndash;Q4 write-up</a> for the design reasoning, cost analysis and reflection.</li>
+</ol>
+
+<h2>4. Where each submission requirement is</h2>
+<div class="wrap">
+<table>
+  <tr><th>Requirement</th><th>File in this ZIP</th><th>Online</th></tr>
+  <tr><td>GitHub repository with README</td><td><a href="README.md">README.md</a></td><td><a href="https://github.com/danihak/mira-ai-project-assistant" target="_blank" rel="noopener">Repo</a></td></tr>
+  <tr><td>Workflow JSON (import into n8n)</td><td><a href="workflow/mira_workflow.json">workflow/mira_workflow.json</a></td><td><a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/workflow/mira_workflow.json" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>Architecture diagram</td><td><a href="diagram/mira_architecture.png">diagram/mira_architecture.png</a> (also <a href="diagram/mira_architecture.svg">.svg</a> and <a href="diagram/mira_architecture.excalidraw">.excalidraw</a>)</td><td><a href="https://github.com/danihak/mira-ai-project-assistant/tree/main/diagram" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>Screenshot: workflow canvas</td><td><a href="screenshots/01_workflow_canvas.png">01_workflow_canvas.png</a></td><td rowspan="3"><a href="https://github.com/danihak/mira-ai-project-assistant/tree/main/screenshots" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>Screenshot: Mira in action</td><td><a href="screenshots/02_mira_in_action_alerts.png">02</a>, <a href="screenshots/03_mira_in_action_audit_footer.png">03</a>, <a href="screenshots/04_mira_refuses_vague_request.png">04</a></td></tr>
+  <tr><td>Screenshot: observability traces</td><td><a href="screenshots/05_langfuse_trace_tree.png">05</a>, <a href="screenshots/06_langfuse_experiments_v1_vs_v2.png">06</a>, <a href="screenshots/07_langfuse_experiment_scores.png">07</a>, <a href="screenshots/08_langfuse_dashboard.png">08</a></td></tr>
+  <tr><td>Baseline results, all 12 inputs</td><td><a href="tests/results/baseline_results.md">baseline_results.md</a> (12/12) and <a href="tests/results/run1_baseline_results.md">run1_baseline_results.md</a> (11/12, before fixes)</td><td><a href="https://github.com/danihak/mira-ai-project-assistant/tree/main/tests/results" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>Q1 Ideation</td><td><a href="docs/Q1_ideation.md">docs/Q1_ideation.md</a></td><td><a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/docs/Q1_ideation.md" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>Q2 Architecture write-up</td><td><a href="docs/Q2_architecture_writeup.md">docs/Q2_architecture_writeup.md</a></td><td><a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/docs/Q2_architecture_writeup.md" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>Q3 Program Charter</td><td><a href="docs/Q3_program_charter.md">docs/Q3_program_charter.md</a></td><td><a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/docs/Q3_program_charter.md" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>Q4 Reflection</td><td><a href="docs/Q4_reflection.md">docs/Q4_reflection.md</a></td><td><a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/docs/Q4_reflection.md" target="_blank" rel="noopener">GitHub</a></td></tr>
+  <tr><td>All of Q1&ndash;Q4 in one file</td><td><a href="docs/Mira_Q1-Q4_Submission.pdf">docs/Mira_Q1-Q4_Submission.pdf</a></td><td><a href="https://github.com/danihak/mira-ai-project-assistant/blob/main/docs/Mira_Q1-Q4_Submission.pdf" target="_blank" rel="noopener">GitHub</a></td></tr>
+</table>
+</div>
+
+<h2>5. Folder map</h2>
+<div class="wrap">
+<table>
+  <tr><th>Folder</th><th>What is inside</th></tr>
+  <tr><td><code>workflow/</code></td><td>The n8n workflow (<code>mira_workflow.json</code>), the script that builds it, and the source of every code node in <code>src/</code></td></tr>
+  <tr><td><code>workflow/experiments/</code></td><td>The v1 baseline workflow and the Langfuse dataset setup used for the v1 vs v2 experiment</td></tr>
+  <tr><td><code>prompts/</code></td><td>The system prompt of each of the six AI agents</td></tr>
+  <tr><td><code>data/</code></td><td>Project files Mira answers from (description, timeline, risks, task board) and the 12 evaluation inputs</td></tr>
+  <tr><td><code>tests/</code></td><td>Test runner, offline mock server, and results of both live runs</td></tr>
+  <tr><td><code>docs/</code></td><td>Q1&ndash;Q4 write-ups (Markdown and combined PDF)</td></tr>
+  <tr><td><code>diagram/</code></td><td>Architecture diagram (PNG, SVG, Excalidraw)</td></tr>
+  <tr><td><code>screenshots/</code></td><td>Workflow canvas, Mira in action, Langfuse traces, experiments and dashboard</td></tr>
+</table>
+</div>
+
+<h2>6. How to run it yourself (optional, about 10 minutes)</h2>
+<ol>
+  <li>In n8n (Cloud or self-hosted): <em>Workflows &rarr; Import from file</em> &rarr; <code>workflow/mira_workflow.json</code>.</li>
+  <li>Add an OpenAI credential to the six agent nodes (Orchestrator, Planner, Risk Assessor, Status Reporter, Milestone Tracker, Stakeholder Update). No keys are stored in the file.</li>
+  <li>Activate the workflow, open the <strong>Chat with Mira</strong> node and click <em>Open chat</em>. Try: "Which tasks are blocked or at risk?"</li>
+  <li>Optional: run all 12 tests with <code>python3 tests/run_tests.py --url https://&lt;your-n8n&gt;/webhook/mira</code> (Python 3, no extra packages).</li>
+  <li>Optional: connect Langfuse as described in the <a href="README.md">README</a>, section "Setup", step 6.</li>
+</ol>
+<p class="small">Markdown files (.md) open in any text editor; they read best on GitHub, where they are formatted.</p>
+</main>
+</body>
+</html>

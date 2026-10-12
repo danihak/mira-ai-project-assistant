@@ -2,6 +2,8 @@
 
 Capstone project for *Applied Agentic AI for PMs/TPMs*. Mira is a multi-agent n8n workflow that generates **project plans, risk assessments, weekly status reports, milestone alerts and stakeholder updates**, grounded in a project's own files (ABCDE Ltd. AI Adoption Project). It is built so the LLM never has to invent anything.
 
+> **Evaluators:** open [`START_HERE.html`](START_HERE.html) for a guide to every file, with clickable local and GitHub links.
+
 ![Architecture](diagram/mira_architecture.png)
 
 ## Design in one paragraph
