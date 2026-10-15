@@ -13,6 +13,7 @@
 - **Failure 1, Milestone Tracker (T8):** it reported "4 at risk" but listed 3, silently dropping T009, and used task names without IDs. The per-agent trace showed the input FACTS were correct, so the agent was at fault, not the data. Fix: alert counts passed from code, plus a "one row per alert, ID first" rule. After the fix, all 6 alerts appear with IDs.
 - **Failure 2, Risk Assessor (T7):** it cited the blocked security review as evidence for *Integration* risk and gave a vague "ongoing tasks" justification. Fix: evidence links and the ranking are computed in code, and the agent may only quote them. After the fix, R09 → R01 → R05 with correct evidence, at 40% lower cost.
 - **Lesson about evaluators:** my own Grounding Check passed both failures. It caught *invented* IDs, not *missing* or *mislinked* ones. Adding completeness checks and manual review of every output was what exposed them. An automatic metric is only as good as the failure modes it was designed for.
+- **Iteration 3, from the capstone grade (78/100 on hallucination control):** the grader found the next blind spot, a wrong *count* still passed. I reproduced it ("9 Done", "health GREEN", "T024 is Done" were all accepted), then extended the Grounding Check to verify every count, % complete, health rating and task status against Compute Facts. A new offline regression test injects 7 errors (all flagged) and replays the 8 real project-data answers (no false positives). Same lesson: each new evaluator check comes from a failure someone actually found.
 
 ## 2. Improvement plan
 1. **Ask Mira questions in Slack.** Front-end the webhook with the existing n8n Slack bot, threaded per project. Acknowledge immediately to stay within Slack's 3-second limit.
@@ -43,12 +44,13 @@ If prompts plus code already achieve over 98% groundedness, fine-tuning isn't wo
 - **Secrets:** API keys live only in n8n credentials, never in workflow JSON or Git (the exported workflow contains no credentials).
 
 ## 5. Rollout to 10 PMs/TPMs
-| Week | Step |
-|---|---|
-| 1 | Pick 2 champion PMs; shadow mode on the ABCDE project, with Mira and manual reports side by side |
-| 2 | Fix the top issues from traces and feedback; re-run the regression suite |
-| 3 | Onboard 8 more PMs (30-minute session plus a one-page prompt guide); Slack front end live; daily alerts on |
-| 4–6 | Weekly review of the Langfuse dashboard (groundedness, refusals, cost, latency) and time-saved survey |
-| 7 | Go/no-go against the charter's gates: ≥ 98% grounded, 100% count accuracy, ≥ 8/10 weekly active PMs, ≥ 60 min saved per PM per week |
+Week numbers follow the 12-week timeline in the Program Charter (§5 and §9): weeks 1–4 are build and hardening, so the rollout starts in week 5.
+
+| Charter week | Phase | Step |
+|---|---|---|
+| 5–6 | 2. Pilot (shadow mode) | 2 champion PMs run Mira side by side with manual reports on the ABCDE project; differences are logged, fixed and re-tested with the regression suite |
+| 7 | 3. Pilot expansion (assisted mode) | Onboard 8 more PMs (30-minute session plus a one-page prompt guide); Slack front end live; daily milestone alerts on |
+| 8–10 | 3. Pilot expansion (assisted mode) | Weekly review of the Langfuse dashboard (groundedness, refusals, cost, latency) and time-saved survey; weekly office hours |
+| 11–12 | 4. Go / no-go | Steering committee decides against the charter's gates: ≥ 98% grounded, 100% count accuracy, ≥ 8/10 weekly active PMs, ≥ 60 min saved per PM per week. If passed, default mode from week 13 |
 
 **Personal takeaway:** the most valuable design decision wasn't a prompt. It was deciding what the LLM should *not* do. Code computes, the model explains, and the system asks when it doesn't know.

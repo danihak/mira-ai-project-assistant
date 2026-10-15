@@ -7,7 +7,7 @@ Capstone project for *Applied Agentic AI for PMs/TPMs*. Mira is a multi-agent n8
 ![Architecture](diagram/mira_architecture.png)
 
 ## Design in one paragraph
-**Router pattern.** A cheap Orchestrator (gpt-4o-mini, JSON mode) classifies each request; code guardrails then route it to one of five specialist agents, or to a rule-based Clarifier when the input is too vague. **All counting, filtering and date maths happen in a Code node** (*Compute Facts*), so agents only format and explain numbers they were given. A **Grounding Check** evaluator verifies every task ID, risk ID and date in each answer against the source data, and the whole run is traced in **Langfuse** (one generation per agent with tokens and cost, plus a `grounded` score).
+**Router pattern.** A cheap Orchestrator (gpt-4o-mini, JSON mode) classifies each request; code guardrails then route it to one of five specialist agents, or to a rule-based Clarifier when the input is too vague. **All counting, filtering and date maths happen in a Code node** (*Compute Facts*), so agents only format and explain numbers they were given. A **Grounding Check** evaluator verifies every task ID, risk ID, date, count, % complete, health rating and task status in each answer against the source data, and the whole run is traced in **Langfuse** (one generation per agent with tokens and cost, plus a `grounded` score).
 
 | Capability | Agent | Type |
 |---|---|---|
@@ -26,6 +26,7 @@ workflow/src/*.js                ← source of every Code node (readable, review
 prompts/*.md                     ← system prompt of every LLM agent
 data/                            ← project description, timeline, risks, task board, eval inputs
 tests/run_tests.py               ← runs the 12 baseline inputs, auto-checks, writes results
+tests/test_grounding_check.mjs   ← offline test of the Grounding Check: injected wrong counts/statuses must be flagged
 tests/mock_openai_server.py      ← offline mock of OpenAI + Langfuse for plumbing tests
 tests/results/                   ← baseline_results.md + results.json (after you run the tests)
 docs/Q1_ideation.md  docs/Q2_architecture_writeup.md  docs/Q3_program_charter.md  docs/Q4_reflection.md
@@ -93,8 +94,14 @@ python3 workflow/build_workflow.py --local-test   # build that points at the moc
 ```
 Add `[inject-hallucination]` to a request and the mock cites a fake task, a fake risk, an unknown date and an out-of-sprint task. The Grounding Check flags all four.
 
+## Grounding Check regression test (offline, Node 18+)
+```bash
+node tests/test_grounding_check.mjs
+```
+It runs the Code-node source from `workflow/mira_workflow.json` without n8n or an API key. It injects 7 hallucinations that only look plausible (wrong task counts in prose and in a table, wrong % complete, wrong health rating, a Blocked task called Done, an overdue task called on track, a To Do task called overdue): each must be flagged. It then replays the real project-data answers from the final live run: none may be newly flagged.
+
 ## Editing
-Change a prompt in `prompts/` or code in `workflow/src/`, run `python3 workflow/build_workflow.py`, and re-import. Re-run `tests/run_tests.py` after every change (it is the regression suite).
+Change a prompt in `prompts/` or code in `workflow/src/`, run `python3 workflow/build_workflow.py`, and re-import. Re-run `tests/run_tests.py` and `node tests/test_grounding_check.mjs` after every change (they are the regression suite).
 
 ## Submission checklist
 - [x] Workflow JSON + README (this repo)

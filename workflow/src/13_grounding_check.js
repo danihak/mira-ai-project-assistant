@@ -38,6 +38,69 @@ if (router.route === 'milestone') {
 if ((router.route === 'stakeholder_update' || (router.route === 'status' && router.sprint)) && ctx.scope_task_ids) {
   ctx.scope_task_ids.filter(id => !mentioned(id)).forEach(id => flags.push(`Omitted in-scope task ${id}`));
 }
+// v3 numeric + attribute checks (after capstone feedback: "grounding checkers pass ungrounded numeric counts if
+// entity-attribute links are missing"). Every count, % complete and health rating stated in the answer must match a
+// value Compute Facts produced (project-wide or for any sprint), and every task's stated status must match the board.
+if (router.project_ref === 'abcde') {
+  // a count may match the whole project or the sprint the request is about (not any random sprint)
+  const sprintKey = router.sprint ? `Sprint ${router.sprint}` : null;
+  const sprintCounts = sprintKey && facts.by_sprint[sprintKey] ? [facts.by_sprint[sprintKey].counts] : [];
+  const allCounts = [facts.status_counts, ...sprintCounts];
+  const allowed = {
+    Done: allCounts.map(c => c.Done || 0), 'In Progress': allCounts.map(c => c['In Progress'] || 0),
+    Blocked: allCounts.map(c => c.Blocked || 0), 'To Do': allCounts.map(c => c['To Do'] || 0),
+    Overdue: [facts.overdue.length], 'At risk': [facts.at_risk.length],
+  };
+  const statusOf = w => {
+    w = w.toLowerCase().replace(/[-\s]+/g, ' ');
+    if (/^(done|completed?|finished)$/.test(w)) return 'Done';
+    if (w === 'in progress') return 'In Progress';
+    if (w === 'blocked') return 'Blocked';
+    if (w === 'to do' || w === 'not started') return 'To Do';
+    if (w === 'overdue') return 'Overdue';
+    if (w === 'at risk') return 'At risk';
+    return null;
+  };
+  const WORDS = { no: 0, zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+  const num = s => (/^\d+$/.test(s) ? Number(s) : WORDS[s.toLowerCase()]);
+  const STATUS = '(done|completed?|finished|in[- ]progress|blocked|to[- ]do|not[- ]started|overdue|at[- ]risk)';
+  const NUM = '(\\d+|no|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)';
+  const claims = [];
+  const lb = '(?<!(?:sprint|week|weeks|phase|day|days|wk|by|in)\\s)(?<![\\w.%-])';
+  // prose: "5 tasks done", "1 blocked task", "4 at-risk tasks", "no blocked tasks", "1 task currently in progress"
+  for (const m of answer.matchAll(new RegExp(`${lb}${NUM}\\s+(?:(?:tasks?|items?|are|is|currently|remain|remaining|still)\\s+){0,3}${STATUS}\\b`, 'gi'))) claims.push([m[0], num(m[1]), statusOf(m[2])]);
+  // "completed 2 tasks"
+  for (const m of answer.matchAll(new RegExp(`\\b(?:completed|finished)\\s+${NUM}\\s+tasks?\\b`, 'gi'))) claims.push([m[0], num(m[1]), 'Done']);
+  // count tables: "| Done | 5 |"
+  for (const m of answer.matchAll(new RegExp(`\\|\\s*\\**${STATUS}\\**\\s*\\|\\s*\\**(\\d+)\\**\\s*\\|`, 'gi'))) claims.push([m[0].trim(), Number(m[2]), statusOf(m[1])]);
+  for (const [text, n, st] of claims) {
+    if (st && n !== undefined && allowed[st] && !allowed[st].includes(n)) flags.push(`Count not in source data: "${text.replace(/\s+/g, ' ').trim()}" (${st} is ${[...new Set(allowed[st])].join(' or ')} at ${sprintKey ? 'project/' + sprintKey + ' level' : 'project level'})`);
+  }
+  // % complete
+  const pcts = [facts.percent_done, ...sprintCounts.map(c => (c.Total ? Math.round(((c.Done || 0) / c.Total) * 100) : 0))];
+  for (const m of answer.matchAll(/(\d{1,3})\s*%\s*(?:of\s+(?:all\s+)?tasks\s+)?(?:complete|completed|done)\b/gi)) {
+    if (!pcts.includes(Number(m[1]))) flags.push(`Percent complete ${m[1]}% not in source data (project is ${facts.percent_done}%)`);
+  }
+  // health rating
+  for (const m of answer.matchAll(/health[^\n.]{0,30}?\b(RED|AMBER|GREEN)\b/gi)) {
+    if (m[1].toUpperCase() !== facts.health) flags.push(`Health stated as ${m[1].toUpperCase()} but computed health is ${facts.health}`);
+  }
+  // entity-attribute links: the status words right after a task ID must agree with that task's real status
+  const byId = Object.fromEntries(allTaskList.map(t => [t.id, t]));
+  const overdueIds = facts.overdue.map(t => t.id), blockedIds = facts.blocked.map(t => t.id);
+  const seen = new Set();
+  for (const m of answer.matchAll(/\bT0\d{2}\b/g)) {
+    const t = byId[m[0]]; if (!t) continue;
+    const rest = answer.slice(m.index + 4);
+    const seg = rest.split(/\bT0\d{2}\b|\n|\.\s/)[0].slice(0, 160);
+    const said = new Set();
+    for (const w of seg.matchAll(/(?<!un)(?<!to be |must be |be |will be )\b(done|completed|finished|in[- ]progress|blocked|to[- ]do|not[- ]started)\b(?!\s+by)/gi)) said.add(statusOf(w[1]));
+    const key = `${t.id}`;
+    if (said.size && !said.has(t.status) && !seen.has(key + 'status')) { seen.add(key + 'status'); flags.push(`Task ${t.id} described as ${[...said].join('/')} but its status is ${t.status}`); }
+    if (/\boverdue\b/i.test(seg) && !overdueIds.includes(t.id) && !seen.has(key + 'od')) { seen.add(key + 'od'); flags.push(`Task ${t.id} described as overdue but it is not`); }
+    if (/\bon[- ]track\b/i.test(seg) && (overdueIds.includes(t.id) || blockedIds.includes(t.id)) && !seen.has(key + 'ot')) { seen.add(key + 'ot'); flags.push(`Task ${t.id} described as on track but it is ${blockedIds.includes(t.id) ? 'Blocked' : 'overdue'}`); }
+  }
+}
 const notes = [];
 if (router.route !== 'clarify' && router.project_ref !== 'abcde') notes.push('Answer is based only on user-supplied details (no project files loaded) - review before sharing');
 

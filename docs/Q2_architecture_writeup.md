@@ -40,7 +40,7 @@ Two design decisions make the router reliable:
 | **Stakeholder Update** (LLM) — *extended* | **Only** the requested sprint's tasks + audience | Professional email | Out-of-scope sprints are never in its context, so they cannot leak |
 | **Clarifier** (code) | Router output | What's missing + what Mira can do | Deterministic |
 | **Compute Facts** (code) | All project files | Counts, dates, flags, health | All arithmetic and filtering lives here |
-| **Grounding Check** (code) | Answer + source facts | Pass/flags, cost, Langfuse batch | Every task ID, risk ID and date cited must exist; sprint-scope check |
+| **Grounding Check** (code) | Answer + source facts | Pass/flags, cost, Langfuse batch | Every task ID, risk ID and date cited must exist; sprint-scope and completeness checks; every count, % complete and health rating must match Compute Facts; every task's stated status must match the board |
 
 **Reference date.** The sample board runs April–August 2026 with Sprint 3 active, so Mira reports *as of 24 Apr 2026* (end of timeline week 4; week 1 starts 30 Mar 2026, consistent with the Sprint 1 due dates). Without a fixed date, "next 2 weeks" and "at risk" are undefined and the LLM would guess. The date is one setting in *Config + Input*, or can be passed per request.
 
@@ -89,7 +89,7 @@ The estimates made before the run, using exact prompt tokens and estimated outpu
 
 | # | Metric | Definition | Target | How measured |
 |---|---|---|---|---|
-| 1 | **Groundedness rate** | % of responses where every cited task ID, risk ID and date exists in source data | ≥ 98% | Automatic: Grounding Check `grounded` score in Langfuse |
+| 1 | **Groundedness rate** | % of responses where every cited task ID, risk ID, date, count, % complete, health rating and task status matches the source data | ≥ 98% | Automatic: Grounding Check `grounded` score in Langfuse |
 | 2 | **Status accuracy** | % of status reports whose counts match the task board | 100% | Counts come from code; spot-check weekly against board export |
 | 3 | **Correct refusal rate** | % of vague / no-data requests routed to the Clarifier (no plan, risk or status invented) | 100% on the vague test set | Langfuse filter `route:clarify` vs labelled vague inputs |
 | 4 | **Plan groundedness** | % of milestones in generated plans traceable to the timeline | 100% | Test-runner check + monthly sample review |
@@ -103,6 +103,7 @@ The estimates made before the run, using exact prompt tokens and estimated outpu
 - **Router ambiguity → fixed.** "Which tasks are … *at risk* of missing their deadline" (T8) collides with the *risk* intent. Added an explicit disambiguation rule to the Orchestrator prompt (task delivery = milestone; risk register = risk), and the mock-router regression run now routes T8 correctly.
 - **T006 is the hidden test.** Besides the deliberately blocked T024, T006 (Sprint 2, due 21 Apr) is still In Progress as of 24 Apr, so it is overdue and is also the correct "carry-over" in the Sprint 2 stakeholder email.
 - **Grounding Check verified** with an injected hallucination (fake task T099, risk R13, an unknown date and an out-of-sprint task): all four were flagged.
+- **Numeric and status grounding (v3, after capstone feedback).** The evaluator's grade noted that a wrong count passed the Grounding Check. I confirmed it: "9 tasks Done, 4 Blocked", "health GREEN, 80% complete" and "T024 is Done" all passed. The check now also compares every stated count (prose and tables), % complete and health rating with the values Compute Facts produced, for the whole project or the sprint asked about, and checks the status words next to each task ID against that task's real status. `tests/test_grounding_check.mjs` injects 7 such errors (all flagged) and re-checks the 8 real project-data answers from the final live run (none newly flagged).
 
 **Live baseline runs** (n8n Cloud, gpt-4o-mini). Results are in `tests/results/` (`run1_baseline_results.md` and `baseline_results.md`).
 
@@ -118,7 +119,7 @@ The estimates made before the run, using exact prompt tokens and estimated outpu
 **What went wrong in Run 1, and the fix (the evaluate → fix → re-evaluate loop):**
 1. **T8 omitted a task.** The Milestone Tracker said "4 tasks at risk" but listed only 3 (it dropped T009). It also named tasks without IDs, so "T024" never appeared literally. **Fix:** code now passes `alert_counts`; the prompt requires the task ID in every row and a row count equal to `total_task_alerts`. **After:** all 6 alerts listed with IDs (T024, T006, T007, T008, T009, T025).
 2. **T7 linked evidence to the wrong risk.** The blocked *security* review (T024) was cited as evidence for R02 *Integration*, and R04 was justified with "ongoing tasks related to stakeholder engagement", which cites no task. The top-3 also disagreed with T3. **Fix:** risk-to-task evidence links and the ranking are now computed in code (security → R09, compliance/legal → R05, data → R01, vendor/platform → R10, and so on; score = Blocked 30 / Overdue 20 / At risk 10 + priority). The agent may only quote those links. **After:** R09 (T024 blocked) → R01 (T006 overdue) → R05 (T025 at risk), with consistent evidence, and the answer is 70% shorter ($0.0012 → $0.0007).
-3. **The evaluator had a blind spot.** The Grounding Check passed both failures, because it detected *invented* IDs but not *omitted* or *mislinked* ones. **Fix:** added completeness checks (every alert task in milestone answers, every in-scope task in sprint reports and emails). Mislinked evidence is now prevented by construction rather than detected afterwards.
+3. **The evaluator had a blind spot.** The Grounding Check passed both failures, because it detected *invented* IDs but not *omitted* or *mislinked* ones. **Fix:** added completeness checks (every alert task in milestone answers, every in-scope task in sprint reports and emails). Mislinked evidence is now prevented by construction rather than detected afterwards. A third gap, wrong numbers and wrong task statuses passing as grounded, was closed in v3 (see Testing observations).
 
 ## 9. Evaluation in Langfuse: dataset, experiments, LLM judge, dashboard
 - **Note:** my first attempt linked traces via the older dataset-run-items API, which Langfuse's new Experiments view doesn't display. Moving to the documented OpenTelemetry experiment attributes fixed it.
